@@ -1,12 +1,13 @@
 version: '3.7'
 services:
   worker:
-    image: leishi1313/aurora-admin-backend:dev-latest
+    image: ghcr.io/cosdyan/aurora-admin-backend:latest
     restart: always
     command: bash worker.sh
     environment:
-      ENABLE_SENTRY: 'yes'
+      ENABLE_SENTRY: 'no'
       DATABASE_URL: 'postgresql://aurora:AuroraAdminPanel321@postgres:5432/aurora'
+      ASYNC_DATABASE_URL: 'postgresql+asyncpg://aurora:AuroraAdminPanel321@postgres:5432/aurora'
       TRAFFIC_INTERVAL_SECONDS: 600
       DDNS_INTERVAL_SECONDS: 120
     volumes:
@@ -14,21 +15,22 @@ services:
       - app-data:/app/ansible/priv_data_dirs
 
   backend:
-    image: leishi1313/aurora-admin-backend:dev-latest
+    image: ghcr.io/cosdyan/aurora-admin-backend:latest
     restart: always
-    command: bash -c "while !</dev/tcp/postgres/5432; do sleep 1; done; alembic upgrade heads && python app/main.py"
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8888"
     environment:
       PYTHONPATH: .
       DATABASE_URL: 'postgresql://aurora:AuroraAdminPanel321@postgres:5432/aurora'
-      ENABLE_SENTRY: 'yes'
-      SECREY_KEY: 'AuroraAdminPanel321'
+      ASYNC_DATABASE_URL: 'postgresql+asyncpg://aurora:AuroraAdminPanel321@postgres:5432/aurora'
+      ENABLE_SENTRY: 'no'
+      SECRET_KEY: 'AuroraAdminPanel321'
     volumes:
       - app-data:/app/ansible/priv_data_dirs
     depends_on:
       - postgres
 
   nginx:
-    image: leishi1313/aurora-admin-frontend:dev-latest
+    image: ghcr.io/cosdyan/aurora-admin-frontend:latest
     restart: always
     ports:
       - 8000:80
