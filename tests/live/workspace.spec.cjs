@@ -22,6 +22,9 @@ test('real deployed workspace: user CRUD, server modal, pages and mobile layout'
  await page.getByLabel('搜索邮箱').fill('ui@example.invalid');
  await expect(page.getByText('共 1 位用户')).toBeVisible();
  await page.getByLabel('搜索邮箱').fill('');
+ await row.getByRole('button',{name:'删除',exact:true}).click();
+ await page.getByRole('dialog').getByRole('button',{name:'确定',exact:true}).click();
+ await expect(row).not.toBeVisible();
  await page.goto('/app/servers');
  await expect(page.getByText('已登记服务器',{exact:true})).toBeVisible();
  // Access the server modal through the translated accessible header button.

@@ -155,6 +155,8 @@ const ServerInfoModal = ({ modalProps = {}, close, resolve }: ServerInfoModalPro
     }
     if (actualKeyFileId) {
       data.keyFileId = Number(actualKeyFileId);
+    } else if (serverId) {
+      data.keyFileId = 0;
     }
     serverId
       ? await updateServer({ variables: { ...data } })
@@ -169,7 +171,7 @@ const ServerInfoModal = ({ modalProps = {}, close, resolve }: ServerInfoModalPro
       setAddress(server.address);
       setUser(server.user);
       setHost(server.host);
-      setPort(server.port);
+      setPort(String(server.port ?? ""));
       if (server.sshPasswordSet) {
         setSSHPasswordSet(true);
         setSSHPasswordNotNeeded(false);
@@ -179,7 +181,7 @@ const ServerInfoModal = ({ modalProps = {}, close, resolve }: ServerInfoModalPro
         setSudoPasswordNotNeeded(false);
       }
       if (server.keyFileId) {
-        setKeyFileId(server.keyFileId);
+        setKeyFileId(String(server.keyFileId));
       }
     }
   }, [serverData]);

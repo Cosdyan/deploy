@@ -393,14 +393,19 @@ function update() {
     read_port || exit 1
     echo_config
     echo "-----------------------------------"
+    backup || return 1
+    local files_backup=""
+    if docker-compose exec -T backend test -d /app/files; then
+        files_backup="${AURORA_HOME}/files-backup-$(date +%Y%m%d%H%M%S)"
+        mkdir -p "$files_backup" || return 1
+        chmod 700 "$files_backup"
+        docker-compose cp backend:/app/files/. "$files_backup/" || return 1
+    fi
     get_config || exit 1
     set_config
     set_port "${AURORA_DEF_PORT}" "$PORT" || exit 1
     echo -e "${Info} 同步新配置文件完成！"
-    [[ -z $(docker ps | grep aurora | grep postgres) ]] && \
-        echo -e "${Error} 请先运行极光面板，以保证更新前完成自动备份旧数据库！" && exit 1 || \
-        (echo -e "${Tip} 正在备份旧数据库，如果更新后出现问题，请回退旧版本并恢复旧数据库！" && backup)
-    docker-compose pull
+    docker-compose pull || return 1
     if $ENABLE_IPV6 ; then
         enable_ipv6
     else
@@ -408,6 +413,10 @@ function update() {
     fi
     OLD_IMG_IDS=$(docker images | grep aurora | grep -v latest | awk '{ print $3; }')
     [[ -z $OLD_IMG_IDS ]] || (docker image rm $OLD_IMG_IDS && echo -e "${Info} 旧版镜像清理完成！")
+    if [[ -n "$files_backup" ]]; then
+        docker-compose cp "$files_backup/." backend:/app/files || return 1
+    fi
+    wait_backend || return 1
     docker-compose up -d && \
         (echo -e "${Info} 极光面板更新成功！" && exit 0) || (echo -e "${Error} 极光面板更新失败！" && exit 1)
 }
@@ -494,8 +503,13 @@ function backup() {
     [[ -z $(docker ps | grep aurora | grep postgres) ]] && echo -e "${Tip} 极光面板未在运行，请先启动！" && exit 1
     BACKUP_FILE="data-$(date +%Y%m%d%H%M%S).sql"
     read_db_info
-    cd ${AURORA_HOME} && docker-compose exec -T postgres pg_dump -d $DB_NAME -U $DB_USER -c > $BACKUP_FILE && \
-    echo -e "${Info} 数据库备份成功：${AURORA_HOME}/$BACKUP_FILE" || echo -e "${Error} 数据库备份失败！"
+    cd "${AURORA_HOME}" || return 1
+    if docker-compose exec -T postgres pg_dump -d "$DB_NAME" -U "$DB_USER" -c > "$BACKUP_FILE"; then
+        echo -e "${Info} 数据库备份成功：${AURORA_HOME}/$BACKUP_FILE"
+    else
+        echo -e "${Error} 数据库备份失败，更新已中止！"
+        return 1
+    fi
 }
 
 function restore() {

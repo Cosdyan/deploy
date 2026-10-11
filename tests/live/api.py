@@ -75,6 +75,14 @@ with urllib.request.urlopen(req,timeout=20) as r: uploaded=json.load(r)
 assert not uploaded.get("errors"),uploaded
 uploaded=uploaded["data"]["uploadFile"]
 with urllib.request.urlopen(BASE+uploaded["path"]) as r: assert r.read()==b"aurora verified upload"
+import subprocess
+subprocess.run(["docker","compose","-f","docker-compose.yml","-f","ci-compose.yml","up","-d","--force-recreate","backend"],check=True)
+for attempt in range(60):
+    try:
+        with urllib.request.urlopen(BASE+uploaded["path"],timeout=5) as r: assert r.read()==b"aurora verified upload"
+        break
+    except (urllib.error.URLError,ConnectionError):time.sleep(2)
+else:raise AssertionError("File did not persist across backend recreation")
 gql('mutation($id:Int!){updateFile(id:$id,name:"CI updated",notes:"")}',{"id":uploaded["id"]})
 assert gql('{files(name:"CI updated"){id name}}')["files"][0]["id"]==uploaded["id"]
 gql('mutation($id:Int!){deleteFile(id:$id)}',{"id":uploaded["id"]})

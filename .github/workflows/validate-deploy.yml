@@ -26,6 +26,8 @@ jobs:
         run: bash tests/installer-ports.sh
       - name: Test administrator terminal and backend readiness
         run: python3 tests/installer-admin.py
+      - name: Test original installer menu parity and safe key rotation
+        run: bash tests/installer-parity.sh
       - name: Validate Compose files
         env:
           AURORA_DB_PASSWORD: isolated_test_password

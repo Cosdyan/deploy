@@ -326,8 +326,8 @@ class Server:
             stmt = stmt.values(port=port)
         if user:
             stmt = stmt.values(user=user)
-        if key_file_id:
-            stmt = stmt.values(key_file_id=key_file_id)
+        if key_file_id is not None:
+            stmt = stmt.values(key_file_id=key_file_id or None)
         if config:
             stmt = stmt.values(config=config)
         if ssh_password:

@@ -341,5 +341,6 @@
   "Online now": "本页在线",
   "Registered servers": "已登记服务器",
   "Complete server name and address": "请填写服务器名称和地址",
-  "SSH port must be between 1 and 65535": "SSH 端口必须是 1–65535 的整数"
+  "SSH port must be between 1 and 65535": "SSH 端口必须是 1–65535 的整数",
+  "Please select a file": "请选择要上传的文件"
 }

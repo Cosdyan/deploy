@@ -9,6 +9,7 @@ from app.db.models import PortUser as DBPortUser
 from app.db.models import Server as DBServer
 from app.db.models import ServerUser as DBServerUser
 from app.db.models import User as DBUser
+from app.db.models import DeploymentLog as DBDeploymentLog
 from app.db.async_session import async_db_session
 from app.utils.selection import get_selections
 from sqlalchemy import func, insert, inspect, select, update, delete
@@ -238,6 +239,9 @@ class User:
         if id == info.context["request"].state.user.id:
             raise ValueError("Cannot delete your own account")
         async with async_db_session() as async_db:
+            await async_db.execute(delete(DBServerUser).where(DBServerUser.user_id == id))
+            await async_db.execute(delete(DBPortUser).where(DBPortUser.user_id == id))
+            await async_db.execute(update(DBDeploymentLog).where(DBDeploymentLog.created_by_id == id).values(created_by_id=None))
             result = await async_db.execute(
                 delete(DBUser).where(DBUser.id == id)
             )

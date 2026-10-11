@@ -14,6 +14,7 @@ services:
     volumes:
       - $HOME/.ssh/id_rsa:/app/ansible/env/ssh_key
       - app-data:/app/ansible/priv_data_dirs
+      - file-data:/app/files
     depends_on:
       - redis
     networks:
@@ -33,6 +34,7 @@ services:
       SECRET_KEY: ${AURORA_SECRET_KEY:?Configure_AURORA_SECRET_KEY_in_dotenv}
     volumes:
       - app-data:/app/ansible/priv_data_dirs
+      - file-data:/app/files
     depends_on:
       - postgres
       - redis
@@ -77,6 +79,7 @@ services:
 volumes:
   db-data:
   app-data:
+  file-data:
 
 networks:
   worker:
