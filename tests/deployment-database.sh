@@ -28,8 +28,8 @@ start_database() {
         -e POSTGRES_USER=aurora -e POSTGRES_PASSWORD="$AURORA_DB_PASSWORD" -e POSTGRES_DB=aurora \
         -v "$volume:/var/lib/postgresql/data" "$@" >/dev/null
     for ((attempt=0; attempt<60; attempt++)); do
-        if docker exec "$name" pg_isready -U aurora -d aurora >/dev/null 2>&1 &&
-            docker exec "$name" psql -U aurora -d aurora -Atc 'SELECT 1' >/dev/null 2>&1; then
+        if docker exec "$name" pg_isready -h 127.0.0.1 -U aurora -d aurora >/dev/null 2>&1 &&
+            docker exec "$name" psql -h 127.0.0.1 -U aurora -d aurora -Atc 'SELECT 1' >/dev/null 2>&1; then
             return 0
         fi
         sleep 2
