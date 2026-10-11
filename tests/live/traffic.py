@@ -12,11 +12,11 @@ def gql(q,variables=None):
     assert not r.get("errors"),r
     return r["data"]
 sid=next(x["id"] for x in gql("{servers{id name}}")["servers"] if x["name"]=="CI SSH target")
-contract={"schemaVersion":"aurora-exec/v1","contractKey":"ci_traffic_http","version":1,"title":"CI traffic quota lifecycle","requiresPort":True,"exec":{"bin":"/usr/bin/python3","baseArgs":["-m","http.server","18086","--directory","/tmp/aurora-ci-traffic"],"workingDir":"/tmp"},"params":[]}
+contract={"schemaVersion":"aurora-exec/v1","contractKey":"ci_traffic_http","version":1,"title":"CI traffic quota lifecycle","requiresPort":True,"exec":{"bin":"/usr/bin/python3","baseArgs":["-m","http.server","--directory","/tmp/aurora-ci-traffic"],"workingDir":"/tmp"},"params":[{"key":"listen_port","type":"int","label":"Listen port","default":18086,"emit":{"pos":0}}]}
 service=gql("mutation($c:JSON!){createServiceDefinition(configJson:$c){id}}",{"c":contract})["createServiceDefinition"]["id"]
 gql("mutation($s:Int!){addPort(serverId:$s,num:18086)}",{"s":sid})
 pid=gql("query($s:Int!){port(serverId:$s,num:18086){id}}",{"s":sid})["port"]["id"]
-dep=gql("mutation($s:[Int!]!,$service:Int!,$p:Int!){deployService(serverIds:$s,serviceId:$service,portId:$p,values:{}){id}}",{"s":[sid],"service":service,"p":pid})["deployService"][0]["id"]
+dep=gql("mutation($s:[Int!]!,$service:Int!,$p:Int!){deployService(serverIds:$s,serviceId:$service,portId:$p,values:{listen_port:18086}){id}}",{"s":[sid],"service":service,"p":pid})["deployService"][0]["id"]
 def wait(active,status):
     deadline=time.monotonic()+180
     while time.monotonic()<deadline:
