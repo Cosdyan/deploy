@@ -1,0 +1,10 @@
+---
+- name: Sync current traffic control script
+  copy:
+    src: files/tc.sh
+    dest: /usr/local/bin/tc.sh
+    owner: root
+    group: root
+    mode: '0755'
+- name: Apply port traffic control
+  command: /usr/local/bin/tc.sh {{ tc_args }}
