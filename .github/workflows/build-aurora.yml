@@ -30,6 +30,13 @@ jobs:
           curl -fsS http://127.0.0.1:8000/api -o original-api.json || true
           sudo sh -c 'cd /root/aurora && docker compose logs --no-color --tail=80' || true
           docker run --rm --entrypoint sh leishi1313/aurora-admin-backend:latest -c 'find app/api -name "*.py" -maxdepth 3; head -n 100 app/main.py; head -n 100 tasks/app.py' || true
+      - name: Preserve original released task implementations for feature parity
+        if: always()
+        run: |
+          docker run --rm --entrypoint python leishi1313/aurora-admin-backend:latest -c 'import pathlib,json; paths=["tasks/app.py","tasks/port.py","tasks/tc.py","tasks/traffic.py","tasks/iptables.py","tasks/utils/usage.py","tasks/utils/handlers.py","tasks/utils/server.py","tasks/utils/runner.py","app/utils/tasks.py","app/db/schemas/port.py","app/api/v1/forward_rule.py"]; print(json.dumps({p:pathlib.Path(p).read_text() for p in paths if pathlib.Path(p).is_file()}))' > original-task-source.json
+          echo ORIGINAL_TASK_SOURCE_BEGIN
+          cat original-task-source.json
+          echo ORIGINAL_TASK_SOURCE_END
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -37,6 +44,7 @@ jobs:
           path: |
             original-install.sh
             original-api.json
+            original-task-source.json
   resolve-sources:
     runs-on: ubuntu-latest
     outputs:
@@ -199,6 +207,15 @@ jobs:
           npm install --no-save @playwright/test@1.56.1
           npx playwright install --with-deps chromium
           npx playwright test --config tests/live/playwright.config.cjs
+      - name: Diagnose legacy Ansible compatibility without enabling unverified tasks
+        continue-on-error: true
+        env:
+          AURORA_DB_PASSWORD: ci_database_password_123
+          AURORA_SECRET_KEY: ci_signing_secret_isolated_only
+        run: |
+          set -o pipefail
+          docker compose -f docker-compose.yml -f ci-compose.yml exec -T worker ansible --version 2>&1 | tee legacy-compatibility.log
+          docker compose -f docker-compose.yml -f ci-compose.yml exec -T worker ansible all -i 'host.docker.internal,' -u aurora_ci -m ping -e 'ansible_password=ci_ssh_password_123 ansible_ssh_common_args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"' 2>&1 | tee -a legacy-compatibility.log
       - name: Save deployed service logs
         if: always()
         env:
@@ -216,6 +233,7 @@ jobs:
             live-report/
             test-results/
             isolated-stack.log
+            legacy-compatibility.log
   build-candidates:
     needs: [resolve-sources, isolated-tests, frontend-regression, isolated-stack]
     runs-on: ubuntu-latest
