@@ -3,6 +3,7 @@ import { gql, useQuery, useMutation } from "@apollo/client";
 import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import ModalShell from "../ui/ModalShell";
 import { useModal } from "@/atoms/modal";
 import { useAuthReducer } from "@/atoms/auth";
@@ -55,7 +56,7 @@ export default function Users() {
       {!loading && !accounts.length && <tr><td colSpan={5} className="p-10 text-center text-muted-foreground">{t("No matching users")}</td></tr>}
     </tbody></table></div>
     <div className="flex items-center justify-between text-sm text-muted-foreground"><span>{t("Total users", {count})}</span><div className="flex gap-2"><Button variant="outline" disabled={!offset || loading} onClick={() => setOffset(offset - 10)}>{t("Previous")}</Button><Button variant="outline" disabled={offset + 10 >= count || loading} onClick={() => setOffset(offset + 10)}>{t("Next")}</Button></div></div>
-    {editing && <ModalShell title={t(editing.id ? "Edit user" : "Add user")} onClose={() => setEditing(null)} footer={<><Button variant="outline" onClick={() => setEditing(null)}>{t("Cancel")}</Button><Button type="submit" form="account-form" disabled={busy}>{t("Save")}</Button></>}>
+    {editing && <Dialog open onOpenChange={open => {if (!open) setEditing(null);}}><DialogContent><ModalShell title={t(editing.id ? "Edit user" : "Add user")} onClose={() => setEditing(null)} footer={<><Button variant="outline" onClick={() => setEditing(null)}>{t("Cancel")}</Button><Button type="submit" form="account-form" disabled={busy}>{t("Save")}</Button></>}>
       <form id="account-form" onSubmit={save} className="space-y-4">
         {message && <p role="alert" className="text-destructive">{message}</p>}
         <label className="block space-y-2"><span>{t("Email")}</span><Input type="email" required value={editing.email} onChange={e => setEditing({...editing, email: e.target.value})} /></label>
@@ -64,6 +65,6 @@ export default function Users() {
         <label className="flex gap-2"><input type="checkbox" disabled={editing.id === selfId} checked={editing.isActive} onChange={e => setEditing({...editing, isActive: e.target.checked})} />{t("Active")}</label>
         <label className="block space-y-2"><span>{t("Notes")}</span><Input value={editing.notes} onChange={e => setEditing({...editing, notes: e.target.value})} /></label>
       </form>
-    </ModalShell>}
+    </ModalShell></DialogContent></Dialog>}
   </div>;
 }

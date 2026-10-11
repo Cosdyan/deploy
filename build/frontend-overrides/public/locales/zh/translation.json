@@ -342,5 +342,12 @@
   "Registered servers": "已登记服务器",
   "Complete server name and address": "请填写服务器名称和地址",
   "SSH port must be between 1 and 65535": "SSH 端口必须是 1–65535 的整数",
-  "Please select a file": "请选择要上传的文件"
+  "Please select a file": "请选择要上传的文件",
+  "Add port": "添加端口",
+  "External port": "外部映射端口",
+  "Optional": "可选",
+  "Port must be between 1 and 65535": "端口必须是 1–65535 的整数",
+  "Delete port": "删除端口",
+  "Delete port confirmation": "确定删除此端口及其用户授权和配置？",
+  "User already assigned": "该用户已获得此端口权限"
 }

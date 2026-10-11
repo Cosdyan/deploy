@@ -11,6 +11,32 @@ on:
 permissions:
   contents: read
 jobs:
+  original-reference:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download the original author installer requested by the user
+        run: curl -fsSL https://raw.githubusercontent.com/Aurora-Admin-Panel/deploy/main/install.sh -o original-install.sh
+      - name: Install original published release on a disposable VM
+        id: install
+        continue-on-error: true
+        run: python3 tests/reference-install.py
+      - name: Record original image metadata and API availability
+        if: always()
+        run: |
+          docker images --digests
+          docker ps -a
+          curl -fsS http://127.0.0.1:8000/api -o original-api.json || true
+          sudo sh -c 'cd /root/aurora && docker compose logs --no-color --tail=80' || true
+          docker run --rm --entrypoint sh leishi1313/aurora-admin-backend:latest -c 'find app/api -name "*.py" -maxdepth 3; head -n 100 app/main.py; head -n 100 tasks/app.py' || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: original-reference
+          path: |
+            original-install.sh
+            original-api.json
   resolve-sources:
     runs-on: ubuntu-latest
     outputs:
