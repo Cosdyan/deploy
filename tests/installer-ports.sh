@@ -98,6 +98,7 @@ done
     install_all() { :; }
     docker() { :; }
     docker-compose() { :; }
+    create_superuser() { :; }
     get_config() { cp "$ROOT/docker-compose.yml" "$AURORA_DOCKER_YML"; }
     read_config() { :; }
     echo_config() { [[ $PORT == 8000 && -z $IP ]]; }
@@ -116,6 +117,7 @@ done
     install_all() { :; }
     docker() { :; }
     docker-compose() { :; }
+    create_superuser() { :; }
     get_config() { cp "$ROOT/docker-compose.yml" "$AURORA_DOCKER_YML"; }
     read_config() { :; }
     set_config() { :; }

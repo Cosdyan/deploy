@@ -6,6 +6,7 @@ on:
       - install.sh
       - docker-compose.yml
       - docker-compose-dev.yml
+      - tests/**
       - build/**
       - .github/workflows/**
   workflow_dispatch:
@@ -23,6 +24,8 @@ jobs:
           test -s build/frontend.nginx.conf
       - name: Test installer port parsing and installation flow
         run: bash tests/installer-ports.sh
+      - name: Test administrator terminal and backend readiness
+        run: python3 tests/installer-admin.py
       - name: Validate Compose files
         env:
           AURORA_DB_PASSWORD: isolated_test_password

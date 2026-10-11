@@ -324,6 +324,35 @@ function echo_config() {
     $ENABLE_IPV6 && echo -e "${Info} 已开启 IPV6 支持" || echo -e "${Info} 未开启 IPV6 支持"
 }
 
+function wait_backend() {
+    local attempt
+    echo -e "${Info} 正在等待后端完成数据库迁移并启动 ..."
+    for ((attempt=1; attempt<=60; attempt++)); do
+        # Uvicorn starts listening only after the startup migration succeeds.
+        if docker-compose exec -T backend python -c \
+            "import socket; socket.create_connection(('127.0.0.1', 8888), timeout=2).close()" \
+            </dev/null >/dev/null 2>&1; then
+            return 0
+        fi
+        sleep 2
+    done
+    echo -e "${Error} 后端在等待时间内未就绪，请检查以下日志："
+    docker-compose logs --tail=80 backend postgres
+    return 1
+}
+
+function create_superuser() {
+    # Use the controlling terminal even when the installer stdin is redirected.
+    # Never disable TTY here: initial_data.py uses input() and getpass().
+    if ! ( : </dev/tty ) 2>/dev/null; then
+        echo -e "${Error} 创建管理员需要交互终端，请在 SSH 终端中运行脚本并选择 13。"
+        return 1
+    fi
+    wait_backend || return 1
+    echo -e "${Info} 请按提示输入管理员邮箱和密码（密码输入时不显示字符）"
+    docker-compose exec backend python app/initial_data.py </dev/tty
+}
+
 function install() {
     install_all
     [[ -n $(docker ps | grep aurora) ]] && echo -e "${Tip} 极光面板已经安装，且正在运行！" && exit 0
@@ -348,8 +377,16 @@ function install() {
     [[ ! -d "$HOME"/.ssh ]] && mkdir -p "$HOME"/.ssh
     # avoid docker creating a directory automatically
     [[ ! -f "$HOME"/.ssh/id_rsa ]] && touch "$HOME"/.ssh/id_rsa
-    docker-compose up -d && docker-compose exec backend python app/initial_data.py && \
-    (echo -e "${Info} 极光面板安装成功，已启动！" && exit 0) || (echo -e "${Error} 极光面板安装失败！" && exit 1)
+    if ! docker-compose up -d; then
+        echo -e "${Error} 极光面板容器启动失败！"
+        return 1
+    fi
+    if create_superuser; then
+        echo -e "${Info} 极光面板安装成功，已启动！"
+    else
+        echo -e "${Error} 容器已启动，但管理员创建未完成。请处理上述错误后重新运行脚本，选择 13 添加管理员。"
+        return 1
+    fi
 }
 
 function update() {
@@ -484,7 +521,7 @@ function restore() {
 function add_superu() {
     check_install || exit 1
     [[ -z $(docker ps | grep aurora | grep backend) ]] && echo -e "${Tip} 极光面板未在运行，请先启动！" && exit 1
-    cd ${AURORA_HOME} && docker-compose exec backend python app/initial_data.py
+    cd "${AURORA_HOME}" && create_superuser
 }
 
 function set_traffic_interval() {
