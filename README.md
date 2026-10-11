@@ -86,7 +86,7 @@ ip6tables -t nat -A POSTROUTING -s fd00:ea23:9c80:4a54:e242:5f97::/96 -j MASQUER
 
 [查看镜像编译工作流](.github/workflows/build-aurora.yml) · [查看 GitHub Actions](https://github.com/Cosdyan/deploy/actions)
 
-一键安装使用此仓库的配置，而不是原作者仓库：
+一键安装使用此仓库的配置：
 
 ```bash
 curl -fsSLo aurora-install.sh https://raw.githubusercontent.com/Cosdyan/deploy/main/install.sh
