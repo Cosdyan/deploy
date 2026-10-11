@@ -29,7 +29,7 @@ def worker(code):
     subprocess.run(["docker","compose","-f","docker-compose.yml","-f","ci-compose.yml","exec","-T","worker","python","-c",code],check=True)
 worker("from tasks.utils.connect import connect;\nwith connect("+str(sid)+") as conn: conn.sudo('mkdir -p /tmp/aurora-ci-traffic',hide=True); conn.sudo('dd if=/dev/zero of=/tmp/aurora-ci-traffic/payload.bin bs=1048576 count=2 status=none',hide=True)")
 wait(True,"deployed")
-worker("from tasks.meter import collect_port_traffic, collect_all_port_traffic; from tasks.config import huey;\nassert any(task.name == 'collect_all_port_traffic' for task in huey._registry.periodic_tasks), 'Traffic scheduler not registered';\nresult=collect_port_traffic("+str(sid)+"); result.get(blocking=True,timeout=60)")
+worker("from tasks.meter import collect_port_traffic, collect_all_port_traffic; from tasks.config import huey;\nassert any(task.name == 'collect_all_port_traffic' for task in huey._registry.periodic_tasks), 'Traffic scheduler not registered';\nresult=collect_port_traffic("+str(sid)+"); completed=result.get(blocking=True,timeout=60); assert completed[\"status\"]==\"collected\" and completed[\"ports\"]>=1, completed")
 gql("mutation($p:Int!){setPortPolicy(id:$p,config:{quota:1048576,quota_action:8})}",{"p":pid})
 worker("import urllib.request,time;\nfor attempt in range(30):\n try:\n  response=urllib.request.urlopen('http://host.docker.internal:18086/payload.bin',timeout=10); assert len(response.read())==2097152; break\n except OSError:\n  time.sleep(1)\nelse: raise AssertionError('HTTP service unavailable')")
 time.sleep(1)

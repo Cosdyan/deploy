@@ -52,7 +52,7 @@ def collect_port_traffic(server_id):
             ports=db.query(Port).filter(Port.server_id==server_id,Port.is_active==True).all()
             numbers=[port.num for port in ports]
         if not numbers:
-            return
+            return {"status":"empty","server_id":server_id,"ports":0}
         with connect(server_id) as conn:
             conn.sudo("sh -c " + shlex.quote(meter_commands(numbers)),hide=True)
             result=conn.sudo("sh -c " + shlex.quote("set -e; iptables-save -c; ip6tables-save -c"),hide=True)
@@ -76,6 +76,7 @@ def collect_port_traffic(server_id):
             for port in ports:
                 db.refresh(port)
                 check_port_limits(db,port)
+        return {"status":"collected","server_id":server_id,"ports":len(ports)}
 
 interval=max(1,int(TRAFFIC_INTERVAL_SECONDS)//60)
 @huey.periodic_task(crontab(minute="*"))
