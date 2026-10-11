@@ -27,7 +27,7 @@ def wait(active,status):
     raise AssertionError(value)
 def worker(code):
     subprocess.run(["docker","compose","-f","docker-compose.yml","-f","ci-compose.yml","exec","-T","worker","python","-c",code],check=True)
-worker("from tasks.utils.connect import connect;\nwith connect("+str(sid)+") as conn: conn.sudo('mkdir -p /tmp/aurora-ci-traffic; dd if=/dev/zero of=/tmp/aurora-ci-traffic/payload.bin bs=1048576 count=2 status=none',hide=True)")
+worker("from tasks.utils.connect import connect;\nwith connect("+str(sid)+") as conn: conn.sudo('mkdir -p /tmp/aurora-ci-traffic',hide=True); conn.sudo('dd if=/dev/zero of=/tmp/aurora-ci-traffic/payload.bin bs=1048576 count=2 status=none',hide=True)")
 wait(True,"deployed")
 worker("from tasks.meter import collect_port_traffic; collect_port_traffic.call_local("+str(sid)+")")
 gql("mutation($p:Int!){setPortPolicy(id:$p,config:{quota:1048576,quota_action:8})}",{"p":pid})

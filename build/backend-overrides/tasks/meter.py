@@ -54,8 +54,8 @@ def collect_port_traffic(server_id):
         if not numbers:
             return
         with connect(server_id) as conn:
-            conn.sudo(meter_commands(numbers),hide=True)
-            result=conn.sudo("iptables-save -c; ip6tables-save -c",hide=True)
+            conn.sudo("sh -c " + shlex.quote(meter_commands(numbers)),hide=True)
+            result=conn.sudo("sh -c " + shlex.quote("set -e; iptables-save -c; ip6tables-save -c"),hide=True)
         totals=parse_counters(result.stdout)
         with db_session() as db:
             ports=db.query(Port).filter(Port.server_id==server_id,Port.is_active==True).all()
