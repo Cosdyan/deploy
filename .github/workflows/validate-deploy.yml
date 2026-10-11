@@ -1,0 +1,30 @@
+name: Validate Deployment
+on:
+  push:
+    branches: [main]
+    paths:
+      - install.sh
+      - docker-compose.yml
+      - docker-compose-dev.yml
+      - build/**
+      - .github/workflows/**
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check installer and required files
+        run: |
+          bash -n install.sh
+          test -s build/frontend.Dockerfile
+          test -s build/frontend.nginx.conf
+      - name: Validate Compose files
+        run: |
+          docker compose -f docker-compose.yml config --quiet
+          docker compose -f docker-compose-dev.yml config --quiet
+      - name: Validate frontend Nginx configuration
+        run: |
+          docker run --rm -v "$PWD/build/frontend.nginx.conf:/etc/nginx/conf.d/default.conf:ro" nginx:1.27-alpine nginx -t
