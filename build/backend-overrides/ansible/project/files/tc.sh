@@ -24,6 +24,8 @@ ifb="${AURORA_TC_IFB:-aurora-ifb}"
 [[ -n "$interface" ]] || { echo "Default network interface not found" >&2; exit 1; }
 ip link show dev "$interface" >/dev/null
 class="$(printf '%x' "$port")"
+ingress_parent=ffff:
+if tc qdisc show dev "$interface" | grep -q 'qdisc clsact '; then ingress_parent=ffff:fff2; fi
 
 # Separate EtherTypes use different priorities; 32-bit handles identify ports.
 remove_filters() {
@@ -79,21 +81,21 @@ if ((ingress > 0)); then
         ip link add "$ifb" type ifb
     fi
     ip link set dev "$ifb" up
-    if ! tc qdisc show dev "$interface" | grep -q 'qdisc ingress ffff:'; then
+    if ! tc qdisc show dev "$interface" | grep -Eq 'qdisc (ingress|clsact) '; then
         tc qdisc add dev "$interface" handle ffff: ingress
     fi
     # Each port owns its redirect filters; other inbound traffic is untouched.
-    remove_filters "$interface" ffff:
+    remove_filters "$interface" "$ingress_parent"
     for family in ip ipv6; do
         priority=49150; [[ "$family" != ipv6 ]] || priority=49151
         for transport in tcp udp; do
             slot=0; [[ "$transport" != udp ]] || slot=1
-            tc filter add dev "$interface" parent ffff: protocol "$family" pref "$priority" handle "$((port * 2 + slot))" flower ip_proto "$transport" dst_port "$port" action mirred egress redirect dev "$ifb"
+            tc filter add dev "$interface" parent "$ingress_parent" protocol "$family" pref "$priority" handle "$((port * 2 + slot))" flower ip_proto "$transport" dst_port "$port" action mirred egress redirect dev "$ifb"
         done
     done
     apply_port "$ifb" 2 dst "$ingress"
 else
-    remove_filters "$interface" ffff:
+    remove_filters "$interface" "$ingress_parent"
     remove_port "$ifb" 2
 fi
 echo "Port $port traffic control updated"
