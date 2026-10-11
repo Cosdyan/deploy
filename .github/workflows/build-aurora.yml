@@ -207,13 +207,12 @@ jobs:
           npm install --no-save @playwright/test@1.56.1
           npx playwright install --with-deps chromium
           npx playwright test --config tests/live/playwright.config.cjs
-      - name: Diagnose legacy Ansible compatibility without enabling unverified tasks
-        continue-on-error: true
+      - name: Require real legacy Ansible compatibility on the disposable SSH target
         env:
           AURORA_DB_PASSWORD: ci_database_password_123
           AURORA_SECRET_KEY: ci_signing_secret_isolated_only
         run: |
-          set -o pipefail
+          set -euo pipefail
           docker compose -f docker-compose.yml -f ci-compose.yml exec -T worker ansible --version 2>&1 | tee legacy-compatibility.log
           docker compose -f docker-compose.yml -f ci-compose.yml exec -T worker ansible all -i 'host.docker.internal,' -u aurora_ci -m ping -e 'ansible_password=ci_ssh_password_123 ansible_ssh_common_args="-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"' 2>&1 | tee -a legacy-compatibility.log
       - name: Save deployed service logs
