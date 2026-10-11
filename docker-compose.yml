@@ -1,4 +1,3 @@
-version: '3.7'
 services:
   worker:
     image: ghcr.io/cosdyan/aurora-admin-backend:latest

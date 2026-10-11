@@ -112,7 +112,12 @@ const ServerInfoModal = ({ modalProps = {}, close, resolve }: ServerInfoModalPro
     if (resolve) resolve(false);
     close();
   };
+  const [validation, setValidation] = useState("");
   const handleSubmit = async () => {
+    setValidation("");
+    if (!name.trim() || !address.trim()) { setValidation(t("Complete server name and address")); return; }
+    if (port && (!/^\\d+$/.test(String(port)) || Number(port) < 1 || Number(port) > 65535)) { setValidation(t("SSH port must be between 1 and 65535")); return; }
+    try {
     let actualKeyFileId = keyFileId;
     if (keyFile && !keyFileId) {
       const fileData = {
@@ -121,7 +126,7 @@ const ServerInfoModal = ({ modalProps = {}, close, resolve }: ServerInfoModalPro
         type: FileTypeEnum.Secret,
         notes: `${name} ${t("SSH Key")}`,
       };
-      const result = await uploadFile(fileData);
+      const result = await uploadFile({ variables: fileData });
       actualKeyFileId = result.data.uploadFile.id;
     }
     const data: Record<string, unknown> = {
@@ -154,6 +159,7 @@ const ServerInfoModal = ({ modalProps = {}, close, resolve }: ServerInfoModalPro
     serverId
       ? await updateServer({ variables: { ...data } })
       : await addServer({ variables: { ...data } });
+    } catch (error) { setValidation(error instanceof Error ? error.message : t("Operation failed")); }
   };
 
   useEffect(() => {
@@ -218,6 +224,7 @@ const ServerInfoModal = ({ modalProps = {}, close, resolve }: ServerInfoModalPro
       }
     >
       <div className="space-y-4">
+        {(validation || serverError || secretsError) && <p role="alert" className="text-sm text-destructive">{validation || serverError?.message || secretsError?.message}</p>}
         <div className="space-y-2">
           <Label>{t("Name")}</Label>
           <Input

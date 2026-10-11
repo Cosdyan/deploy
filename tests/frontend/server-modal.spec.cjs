@@ -37,7 +37,7 @@ for (const withKey of [false, true]) {
       await route.fulfill({ json: { data } });
     });
     await page.goto('http://127.0.0.1:4173/app/servers');
-    await page.getByRole('button', { name: 'Add Server', exact: true }).click();
+    await page.getByRole('button', { name: 'Add Server', exact: true }).first().click();
     const dialog = page.getByRole('dialog');
     await expect(dialog.getByRole('heading', { name: 'Add Server' })).toBeVisible();
     await expect(dialog.getByRole('combobox')).toHaveText('No SSH Key');
@@ -57,7 +57,7 @@ for (const withKey of [false, true]) {
     expect(submissions[0]).not.toHaveProperty('keyFileId');
     expect(errors).toEqual([]);
     // Reopen after submission, choose a real key, and ensure the API receives its numeric ID.
-    await page.getByRole('button', { name: 'Add Server', exact: true }).click();
+    await page.getByRole('button', { name: 'Add Server', exact: true }).first().click();
     await expect(dialog.getByRole('heading', { name: 'Add Server' })).toBeVisible();
     if (withKey) {
       await dialog.getByRole('combobox').click();

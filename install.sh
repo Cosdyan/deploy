@@ -58,7 +58,7 @@ AURORA_YML_URL="https://${GITHUB_RAW_URL}/${AURORA_GITHUB}/deploy/main/docker-co
 AURORA_DEV_YML_URL="https://${GITHUB_RAW_URL}/${AURORA_GITHUB}/deploy/main/docker-compose-dev.yml"
 DOCKER_INSTALL_URL="https://get.docker.com"
 [[ -z $FASTGIT ]] && GITHUB_URL="github.com" || GITHUB_URL="download.fastgit.org"
-DOCKER_COMPOSE_URL="https://${GITHUB_URL}/docker/compose/releases/download/v2.2.3/docker-compose-$(uname -s)-$(uname -m)"
+DOCKER_COMPOSE_URL="https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-$(uname -s)-$(uname -m)"
 
 AURORA_DEF_IP=""
 AURORA_DEF_PORT=8000
@@ -108,17 +108,29 @@ function install_docker() {
     fi
 }
 
-function install_docker_compose() {
-    if ! docker-compose --version > /dev/null 2>&1; then
-        curl -fsSL ${DOCKER_COMPOSE_URL} -o /usr/local/bin/docker-compose && \
-        chmod +x /usr/local/bin/docker-compose && \
-        ln -sf /usr/local/bin/docker-compose /usr/bin/docker-compose
+# Retain this function name so every menu action uses the same Compose selection.
+function docker-compose() {
+    if docker compose version >/dev/null 2>&1; then
+        docker compose "$@"
+    elif command -v docker-compose >/dev/null 2>&1; then
+        command docker-compose "$@"
+    else
+        echo -e "${Error} 未找到 Docker Compose，请先选择安装或更新。"
+        return 1
     fi
+}
+
+function install_docker_compose() {
+    docker compose version >/dev/null 2>&1 && return 0
+    command docker-compose --version >/dev/null 2>&1 && return 0
+    curl -fsSL "$DOCKER_COMPOSE_URL" -o /usr/local/bin/docker-compose || return 1
+    chmod +x /usr/local/bin/docker-compose
 }
 
 function install_all() {
     install_software wget
     install_software curl
+    install_software openssl
     install_docker
     install_docker_compose
 }
@@ -285,8 +297,8 @@ function set_port() {
 }
 
 function check_run() {
-    LEVEL=$1 && [[ -z $LEVEL || $LEVEL != ${Info} || $LEVEL != ${Tip} || $LEVEL != ${Error} ]] && LEVEL=${Tip}
-    TIPS=$2 && [[ -z $TIPS ]] && TIPS="极光面板未在运行！"
+    LEVEL=${1:-$Tip}
+    TIPS=${2:-极光面板未在运行！}
     [[ -z $(docker ps | grep aurora) ]] && echo -e "${LEVEL} $TIPS"
 }
 
@@ -471,7 +483,7 @@ function backend_logs() {
 function frontend_logs() {
     check_install || exit 1
     check_run && exit 1
-    cd ${AURORA_HOME} && docker-compose logs -f --tail="100" frontend
+    cd ${AURORA_HOME} && docker-compose logs -f --tail="100" nginx
 }
 
 function all_logs() {
@@ -572,6 +584,25 @@ function enable_ipv6() {
     echo -e "${Tip} 重启系统会导致 ip6tables 规则被重置，需要重新添加！"
 }
 
+function rotate_secret_key() {
+    check_install || return 1
+    local env_file="${AURORA_HOME}/.env" confirmation new_key backup_file
+    [[ -f "$env_file" ]] || { echo -e "${Error} 缺少 .env，不能更换密钥。"; return 1; }
+    grep -q '^AURORA_SECRET_KEY=' "$env_file" || { echo -e "${Error} .env 中没有安全密钥。"; return 1; }
+    read -r -p "更换密钥会退出所有已登录用户。输入 YES 继续: " confirmation
+    [[ "$confirmation" == YES ]] || return 0
+    new_key=$(openssl rand -hex 32) || return 1
+    backup_file="${env_file}.backup-$(date +%Y%m%d%H%M%S)"
+    cp -p "$env_file" "$backup_file" || return 1
+    chmod 600 "$backup_file"
+    sed -i "s/^AURORA_SECRET_KEY=.*/AURORA_SECRET_KEY=$new_key/" "$env_file" || return 1
+    chmod 600 "$env_file"
+    cd "${AURORA_HOME}" || return 1
+    docker-compose up -d backend || { echo -e "${Error} 重启失败。旧配置备份在 $backup_file"; return 1; }
+    wait_backend || return 1
+    echo -e "${Info} 安全密钥已更换，请重新登录。"
+}
+
 function welcome_aurora() {
     check_system
     echo -e "${Green_font_prefix}
@@ -597,11 +628,12 @@ function welcome_aurora() {
     15. 修改 面板流量同步间隔（默认 ${AURORA_DEF_TRAFF_MIN} 分钟）
     16. 修改 DDNS同步间隔（默认 ${AURORA_DEF_DDNS_MIN} 分钟）
     17. 开启 IPV6 支持（需要本机支持 IPV6）
+    18. 更换安全签名密钥（使已有登录失效）
     ————————————
     0.  退出脚本
     ————————————
     ${Font_color_suffix}"
-    read -r -e -p " 请输入数字 [1-16]: " num && echo
+    read -r -e -p " 请输入数字 [0-18]: " num && echo
     case "$num" in
         1)
             install
@@ -654,11 +686,14 @@ function welcome_aurora() {
         17)
             enable_ipv6
             ;;
+        18)
+            rotate_secret_key
+            ;;
         0)
             exit 0
             ;;
         *)
-            echo -e "${Error} 请输入正确数字 [1-16]"
+            echo -e "${Error} 请输入正确数字 [0-18]"
             ;;
     esac
 }

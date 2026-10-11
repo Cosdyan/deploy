@@ -1,4 +1,4 @@
-name: Build and Verify Aurora (Staging Only)
+name: Build Verify and Publish Aurora
 on:
   push:
     branches: [main]
@@ -62,6 +62,8 @@ jobs:
           repository: Aurora-Admin-Panel/backend
           ref: ${{ needs.resolve-sources.outputs.backend }}
           path: backend-source
+      - name: Apply verified backend fixes
+        run: cp -R build/backend-overrides/. backend-source/
       - name: Build backend for isolated integration test
         run: docker build -t aurora-backend-ci:local backend-source
       - name: Run clean PostgreSQL migrations twice (idempotence)
@@ -110,8 +112,72 @@ jobs:
         with:
           name: frontend-regression-failure
           path: test-results/
+  isolated-stack:
+    needs: resolve-sources
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: Aurora-Admin-Panel/backend
+          ref: ${{ needs.resolve-sources.outputs.backend }}
+          path: stack-backend
+      - uses: actions/checkout@v4
+        with:
+          repository: Aurora-Admin-Panel/frontend
+          ref: ${{ needs.resolve-sources.outputs.frontend }}
+          path: stack-frontend
+      - name: Build exact patched production images
+        run: |
+          cp -R build/backend-overrides/. stack-backend/
+          cp -R build/frontend-overrides/. stack-frontend/
+          cp build/frontend.Dockerfile stack-frontend/Dockerfile
+          cp build/frontend.nginx.conf stack-frontend/nginx.conf
+          docker build -t aurora-backend-ci:local stack-backend
+          docker build -t aurora-frontend-ci:local stack-frontend
+      - name: Deploy complete isolated stack and initialize administrator
+        env:
+          AURORA_DB_PASSWORD: ci_database_password_123
+          AURORA_SECRET_KEY: ci_signing_secret_isolated_only
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.ssh"
+          touch "$HOME/.ssh/id_rsa"
+          printf 'services:\n  backend:\n    image: aurora-backend-ci:local\n  worker:\n    image: aurora-backend-ci:local\n  nginx:\n    image: aurora-frontend-ci:local\n' > ci-compose.yml
+          docker compose -f docker-compose.yml -f ci-compose.yml up -d
+          ready=false
+          for i in $(seq 1 90); do
+            if curl -fsS http://127.0.0.1:8000/api >/dev/null; then ready=true; break; fi
+            sleep 2
+          done
+          test "$ready" = true
+          docker compose -f docker-compose.yml -f ci-compose.yml exec -T backend python -c 'from app.db.session import db_session; from app.db.crud.user import create_user; from app.db.schemas.user import UserCreate; db=db_session(); session=db.__enter__(); create_user(session,UserCreate(email="admin@example.invalid",password="ci_test_password_123",is_active=True,is_superuser=True)); db.__exit__(None,None,None)'
+          python3 tests/live/api.py
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Exercise production UI against real backend
+        run: |
+          npm install --no-save @playwright/test@1.56.1
+          npx playwright install --with-deps chromium
+          npx playwright test --config tests/live/playwright.config.cjs
+      - name: Save deployed service logs
+        if: always()
+        env:
+          AURORA_DB_PASSWORD: ci_database_password_123
+          AURORA_SECRET_KEY: ci_signing_secret_isolated_only
+        run: docker compose -f docker-compose.yml -f ci-compose.yml logs --no-color > isolated-stack.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: isolated-deployment-evidence
+          path: |
+            live-report/
+            test-results/
+            isolated-stack.log
   build-candidates:
-    needs: [resolve-sources, isolated-tests, frontend-regression]
+    needs: [resolve-sources, isolated-tests, frontend-regression, isolated-stack]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -136,6 +202,9 @@ jobs:
           cp build/frontend.Dockerfile source/Dockerfile
           cp build/frontend.nginx.conf source/nginx.conf
           cp -R build/frontend-overrides/. source/
+      - name: Prepare backend
+        if: matrix.component == 'backend'
+        run: cp -R build/backend-overrides/. source/
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
       - name: Build AMD64 and ARM64 without publishing
