@@ -27,6 +27,39 @@ if TYPE_CHECKING:
 
 count_cache: typing.Dict[int, int] = {}
 
+def visible_ports(stmt, user):
+    """Use the same access boundary for lists, individual ports and counts."""
+    if user.is_superuser:
+        return stmt
+    conditions = [DBPort.id.in_(select(DBPortUser.port_id).where(DBPortUser.user_id == user.id))]
+    if user.is_ops:
+        conditions.append(DBPort.server_id.in_(select(DBServerUser.server_id).where(DBServerUser.user_id == user.id)))
+    return stmt.where(or_(*conditions))
+
+
+async def require_port_manager(info: Info, port_id: Optional[int] = None, server_id: Optional[int] = None):
+    user = info.context["request"].state.user
+    if port_id is not None:
+        async with async_db_session() as db:
+            server_id = (await db.execute(select(DBPort.server_id).where(DBPort.id == port_id))).scalar()
+        if server_id is None:
+            raise ValueError("Port not found")
+    if user.is_superuser:
+        return
+    if not user.is_ops:
+        raise PermissionError("Port management requires an administrator")
+    async with async_db_session() as db:
+        assigned = (await db.execute(select(DBServerUser.id).where(
+            DBServerUser.server_id == server_id, DBServerUser.user_id == user.id
+        ))).first()
+    if assigned is None:
+        raise PermissionError("You cannot manage ports on this server")
+
+
+def validate_port_number(value):
+    if value is not None and not 1 <= value <= 65535:
+        raise ValueError("Port must be between 1 and 65535")
+
 
 @strawberry.type
 class Port:
@@ -54,9 +87,12 @@ class Port:
             .options(joinedload(DBPort.server))
         )
 
+        stmt = visible_ports(stmt, info.context["request"].state.user)
         async with async_db_session() as async_db:
             result = await async_db.execute(stmt)
             port = result.scalars().unique().first()
+            if port is None:
+                raise PermissionError("Port not found or access denied")
             return [
                 m.value
                 for m in MethodEnum
@@ -92,6 +128,7 @@ class Port:
             get_selections(info.selected_fields, info.field_name).selections,
         )
 
+        stmt = visible_ports(stmt, info.context["request"].state.user)
         async with async_db_session() as async_db:
             result = await async_db.execute(stmt)
             return result.scalars().unique().all()
@@ -115,7 +152,7 @@ class Port:
         )
         if server_id:
             stmt = stmt.where(DBPort.server_id == server_id)
-        stmt = stmt.offset(offset).limit(limit)
+        stmt = visible_ports(stmt, info.context["request"].state.user).offset(offset).limit(limit)
 
         async with async_db_session() as async_db:
             result = await async_db.execute(stmt)
@@ -146,6 +183,7 @@ class Port:
                 or_(DBPort.num == num, DBPort.external_num == num)
             )
 
+        stmt = visible_ports(stmt, info.context["request"].state.user)
         async with async_db_session() as async_db:
             result = await async_db.execute(stmt)
             return result.scalars().unique().first()
@@ -154,35 +192,12 @@ class Port:
     async def get_port_count(
         info: Info, server_id: Optional[int] = None
     ) -> int:
-        user = info.context["request"].state.user
-
-        if (user.id, server_id) not in count_cache:
-            stmt = select(func.count(DBPort.id, distinct=True))
-            if not user.is_superuser:
-                conditions = [
-                    DBPort.id.in_(
-                        select(DBPortUser.port_id).where(
-                            DBPortUser.user_id == user.id
-                        )
-                    )
-                ]
-                if user.is_ops:
-                    conditions.append(
-                        DBPort.server_id.in_(
-                            select(DBServerUser.server_id).where(
-                                DBServerUser.user_id == user.id
-                            )
-                        )
-                    )
-                stmt = stmt.where(or_(*conditions))
-            if server_id:
-                stmt = stmt.where(DBPort.server_id == server_id)
-            stmt = stmt.where(DBPort.is_active == True)
-
-            async with async_db_session() as async_db:
-                result = await async_db.execute(stmt)
-                count_cache[(user.id, server_id)] = result.scalar()
-        return count_cache[(user.id, server_id)]
+        stmt = visible_ports(select(func.count(DBPort.id)), info.context["request"].state.user)
+        stmt = stmt.where(DBPort.is_active == True)
+        if server_id is not None:
+            stmt = stmt.where(DBPort.server_id == server_id)
+        async with async_db_session() as db:
+            return (await db.execute(stmt)).scalar()
 
     @staticmethod
     async def get_available_ports_for_deployment(
@@ -245,6 +260,9 @@ class Port:
         config: Optional[JSON] = None,
         notes: Optional[str] = None,
     ) -> bool:
+        await require_port_manager(info, server_id=server_id)
+        validate_port_number(num)
+        validate_port_number(external_num)
         stmt = insert(DBPort).values(
             server_id=server_id,
             num=num,
@@ -269,6 +287,12 @@ class Port:
         config: Optional[JSON] = None,
         notes: Optional[str] = None,
     ) -> bool:
+        await require_port_manager(info, port_id=id)
+        if server_id is not None:
+            await require_port_manager(info, server_id=server_id)
+        validate_port_number(num)
+        if external_num is not strawberry.UNSET:
+            validate_port_number(external_num)
         stmt = update(DBPort).where(DBPort.id == id)
         if server_id:
             stmt = stmt.values(server_id=server_id)
@@ -289,13 +313,25 @@ class Port:
 
     @staticmethod
     async def delete_port(info: Info, id: int) -> bool:
-        stmt = delete(DBPort).where(DBPort.id == id)
-
-        async with async_db_session() as async_db:
-            result = await async_db.execute(stmt)
-            await async_db.commit()
+        await require_port_manager(info, port_id=id)
+        from app.db.models import ServerDeployment as DBServerDeployment
+        async with async_db_session() as db:
+            # A running service must be removed through its lifecycle first.
+            active = (await db.execute(select(DBServerDeployment.id).where(
+                DBServerDeployment.port_id == id, DBServerDeployment.is_active == True
+            ))).first()
+            if active:
+                raise ValueError("Remove the active deployment before deleting its port")
+            await db.execute(update(DBServerDeployment).where(
+                DBServerDeployment.port_id == id
+            ).values(port_id=None))
+            port = (await db.execute(select(DBPort).where(DBPort.id == id))).scalars().first()
+            if port is None:
+                return False
+            await db.delete(port)
+            await db.commit()
         count_cache.clear()
-        return result.rowcount > 0
+        return True
 
 
 @strawberry.type
@@ -315,6 +351,7 @@ class PortUser:
         user_id: int,
         config: Optional[JSON] = None,
     ) -> bool:
+        await require_port_manager(info, port_id=port_id)
         stmt = insert(DBPortUser).values(
             port_id=port_id, user_id=user_id, config=config or {}
         )
@@ -327,6 +364,7 @@ class PortUser:
 
     @staticmethod
     async def delete_port_user(info: Info, port_id: int, user_id: int) -> bool:
+        await require_port_manager(info, port_id=port_id)
         stmt = delete(DBPortUser).where(
             DBPortUser.port_id == port_id, DBPortUser.user_id == user_id
         )
@@ -344,10 +382,11 @@ class PortUser:
         user_id: int,
         config: Optional[JSON] = None,
     ) -> bool:
+        await require_port_manager(info, port_id=port_id)
         stmt = update(DBPortUser).where(
             DBPortUser.port_id == port_id, DBPortUser.user_id == user_id
         )
-        if config:
+        if config is not None:
             stmt = stmt.values(config=config)
 
         async with async_db_session() as async_db:

@@ -42,12 +42,38 @@ gql('mutation($s:Int!,$u:Int!){deleteServerUser(serverId:$s,userId:$u)}',{"s":si
 assert len(access(sids[0])) == 1 and len(access(sids[1])) == 1
 gql('mutation($id:Int!){updateUser(id:$id,notes:"",isOps:true)}',{"id":uids[1]})
 assert gql('query($id:Int!){user(id:$id){notes isOps}}',{"id":uids[1]})["user"] == {"notes":"","isOps":True}
-gql('mutation($s:Int!){addPort(serverId:$s,num:18080,config:{},notes:"CI")}',{"s":sids[0]})
+gql('mutation($s:Int!){addPort(serverId:$s,num:18080,notes:"CI")}',{"s":sids[0]})
 port=gql('query($s:Int!){port(serverId:$s,num:18080){id num}}',{"s":sids[0]})["port"]
 assert port["num"]==18080
 gql('mutation($id:Int!){updatePort(id:$id,num:18081)}',{"id":port["id"]})
 assert gql('query($id:Int!){port(id:$id){num}}',{"id":port["id"]})["port"]["num"]==18081
-gql('mutation($id:Int!){deletePort(id:$id)}',{"id":port["id"]})
+# Port grants/revocations must commit, refresh counts and respect server boundaries.
+pid=port["id"]
+gql('mutation($s:Int!){addPort(serverId:$s,num:18082)}',{"s":sids[1]})
+other=gql('query($s:Int!){port(serverId:$s,num:18082){id}}',{"s":sids[1]})["port"]["id"]
+gql('mutation($p:Int!,$u:Int!){addPortUser(portId:$p,userId:$u)}',{"p":pid,"u":uids[0]})
+gql('mutation($p:Int!,$u:Int!){addPortUser(portId:$p,userId:$u)}',{"p":other,"u":uids[0]})
+visible=gql('{paginatedPorts(limit:100){count items{id}}}',token=member)["paginatedPorts"]
+assert visible["count"]==2 and {x["id"] for x in visible["items"]}=={pid,other},visible
+gql('mutation($p:Int!,$u:Int!){deletePortUser(portId:$p,userId:$u)}',{"p":pid,"u":uids[0]})
+visible=gql('{paginatedPorts(limit:100){count items{id}}}',token=member)["paginatedPorts"]
+assert visible["count"]==1 and [x["id"] for x in visible["items"]]==[other],visible
+assert gql('query($p:Int!){port(id:$p){id}}',{"p":pid},token=member)["port"] is None
+ops=login("member2@example.invalid")
+gql('mutation($p:Int!){updatePort(id:$p,notes:"unauthorized")}',{"p":other},token=ops,fail=True)
+gql('mutation($p:Int!,$u:Int!){addPortUser(portId:$p,userId:$u)}',{"p":other,"u":uids[1]},token=ops,fail=True)
+gql('mutation($s:Int!){addPort(serverId:$s,num:18083)}',{"s":sids[1]},token=ops,fail=True)
+gql('mutation($p:Int!){updatePort(id:$p,externalNum:28081,notes:"")}',{"p":pid})
+gql('mutation($p:Int!){updatePort(id:$p,externalNum:null,config:{})}',{"p":pid})
+assert gql('query($p:Int!){port(id:$p){externalNum notes config}}',{"p":pid})["port"]=={"externalNum":None,"notes":"","config":{}}
+gql('mutation($s:Int!){addPort(serverId:$s,num:0)}',{"s":sids[0]},fail=True)
+gql('mutation($p:Int!){updatePort(id:$p,num:65536)}',{"p":pid},fail=True)
+gql('mutation($id:Int!){deletePort(id:$id)}',{"id":pid})
+# Deleting a port with a grant must delete its association, not fail on its foreign key.
+gql('mutation($id:Int!){deletePort(id:$id)}',{"id":other})
+assert gql('{paginatedPorts(limit:100){count items{id}}}',token=member)["paginatedPorts"]=={"count":0,"items":[]}
+print("PASS: port grant/revoke persistence, scoped reads and administrator writes, refreshed counts, external port clearing, range validation and association deletion")
+
 contract={"schemaVersion":"aurora-exec/v1","contractKey":"ci_echo","version":1,"title":"CI echo","requiresPort":False,"exec":{"bin":"/usr/bin/echo","baseArgs":["hello"]},"params":[{"key":"name","type":"string","label":"Name","default":"world","emit":{"arg":"--name"}}]}
 service=gql('mutation($c:JSON!){createServiceDefinition(configJson:$c){id title}}',{"c":contract})["createServiceDefinition"]
 preview=gql('mutation($id:Int!){compileServicePreviewById(id:$id,values:{name:"integration"})}',{"id":service["id"]})["compileServicePreviewById"]
