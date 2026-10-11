@@ -124,6 +124,21 @@ function install_all() {
 }
 
 function get_config() {
+    # Compose requires externally configured credentials.
+    # Never auto-rotate existing installations: their PostgreSQL volume still
+    # contains the credentials used when it was first initialized.
+    if [[ ! -f "${AURORA_HOME}/.env" ]]; then
+        if [[ -f "${AURORA_DOCKER_YML}" ]]; then
+            echo -e "${Error} 检测到旧版部署但没有 .env。为了保护旧数据库，已中止更新。"
+            echo -e "${Tip} 请先备份数据库，在 ${AURORA_HOME}/.env 中设置现有 AURORA_DB_PASSWORD 和 AURORA_SECRET_KEY，再尝试更新。"
+            return 1
+        fi
+        command -v openssl >/dev/null 2>&1 || { echo -e "${Error} 缺少 openssl，请先安装"; return 1; }
+        umask 077
+        printf 'AURORA_DB_PASSWORD=%s\nAURORA_SECRET_KEY=%s\n' "$(openssl rand -hex 24)" "$(openssl rand -hex 32)" > "${AURORA_HOME}/.env"
+        chmod 600 "${AURORA_HOME}/.env"
+        echo -e "${Info} 已生成独立随机数据库密码及签名密钥（保存在 ${AURORA_HOME}/.env）"
+    fi
     echo -e "${Info} 正在下载最新配置文件 ..."
     [[ $AURORA_VERSION == "DEV" ]] && YML_URL=${AURORA_DEV_YML_URL} || YML_URL=${AURORA_YML_URL}
     wget -q $YML_URL -O ${AURORA_DOCKER_YML_TEMP}
