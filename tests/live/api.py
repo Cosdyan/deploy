@@ -66,6 +66,16 @@ gql('mutation($s:Int!){addPort(serverId:$s,num:18083)}',{"s":sids[1]},token=ops,
 gql('mutation($p:Int!){updatePort(id:$p,externalNum:28081,notes:"")}',{"p":pid})
 gql('mutation($p:Int!){updatePort(id:$p,externalNum:null,config:{})}',{"p":pid})
 assert gql('query($p:Int!){port(id:$p){externalNum notes config}}',{"p":pid})["port"]=={"externalNum":None,"notes":"","config":{}}
+policy={"valid_until":0,"due_action":0,"quota":1073741824,"quota_action":3}
+gql('mutation($p:Int!,$c:JSON!){setPortPolicy(id:$p,config:$c)}',{"p":pid,"c":policy})
+assert gql('query($p:Int!){port(id:$p){config}}',{"p":pid})["port"]["config"]==policy
+gql('mutation($p:Int!){setPortPolicy(id:$p,config:{quota:-1})}',{"p":pid},fail=True)
+gql('mutation($p:Int!){setPortPolicy(id:$p,config:{quota:true})}',{"p":pid},fail=True)
+gql('mutation($p:Int!){setPortPolicy(id:$p,config:{due_action:9})}',{"p":pid},fail=True)
+gql('mutation($p:Int!){setPortPolicy(id:$p,config:{arbitrary:"value"})}',{"p":pid},fail=True)
+gql('mutation($p:Int!){setPortPolicy(id:$p,config:{quota:1})}',{"p":other},token=ops,fail=True)
+gql('mutation($p:Int!){setPortPolicy(id:$p,config:{})}',{"p":pid})
+assert all(value==0 for value in gql('query($p:Int!){port(id:$p){config}}',{"p":pid})["port"]["config"].values())
 gql('mutation($s:Int!){addPort(serverId:$s,num:0)}',{"s":sids[0]},fail=True)
 gql('mutation($p:Int!){updatePort(id:$p,num:65536)}',{"p":pid},fail=True)
 gql('mutation($id:Int!){deletePort(id:$id)}',{"id":pid})

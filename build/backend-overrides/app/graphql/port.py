@@ -312,6 +312,26 @@ class Port:
         return result.rowcount > 0
 
     @staticmethod
+    async def set_policy(info: Info, id: int, config: JSON) -> bool:
+        await require_port_manager(info, port_id=id)
+        allowed = {"valid_until", "due_action", "quota", "quota_action"}
+        if not isinstance(config, dict) or set(config) - allowed:
+            raise ValueError("Invalid restriction settings")
+        values = {key: config.get(key, 0) for key in allowed}
+        if any(type(value) is not int or value < 0 for value in values.values()):
+            raise ValueError("Restriction settings must be nonnegative integers")
+        if values["valid_until"] > 253402300799000 or values["quota"] > 9007199254740991:
+            raise ValueError("Restriction value is too large")
+        if values["due_action"] > 8 or values["quota_action"] > 8:
+            raise ValueError("Invalid restriction action")
+        async with async_db_session() as db:
+            port = (await db.execute(select(DBPort).where(DBPort.id == id))).scalars().one()
+            for key, value in values.items():
+                port.config[key] = value
+            await db.commit()
+        return True
+
+    @staticmethod
     async def apply_speed_limits(info: Info, id: int, egress: int, ingress: int) -> JSON:
         await require_port_manager(info, port_id=id)
         if not 0 <= egress <= 1000000000 or not 0 <= ingress <= 1000000000:

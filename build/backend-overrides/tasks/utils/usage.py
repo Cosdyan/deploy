@@ -91,10 +91,24 @@ def apply_port_limits(db: Session, port: Port, action: LimitActionEnum):
     if action == LimitActionEnum.NO_ACTION:
         return
     elif action == LimitActionEnum.DELETE_RULE:
-        if not port.forward_rule:
-            return
-        delete_forward_rule(db, port.server_id, port.id)
-        clean_port_no_update_runner(server_id=port.server.id, port_num=port.num)
+        if port.forward_rule:
+            delete_forward_rule(db, port.server_id, port.id)
+            clean_port_no_update_runner(server_id=port.server.id, port_num=port.num)
+        # Modern service deployments must obey the same port deadline/quota.
+        from app.db.models import ServerDeployment, DeploymentLog
+        from app.db.models.server_deployment import DeploymentStatusEnum, DeploymentActionEnum, DeploymentLogStatusEnum
+        from tasks.deployment import remove_deployment_task
+        deployments = db.query(ServerDeployment).filter(
+            ServerDeployment.port_id == port.id,
+            ServerDeployment.is_active == True,
+            ServerDeployment.status != DeploymentStatusEnum.REMOVING,
+        ).all()
+        for deployment in deployments:
+            deployment.status = DeploymentStatusEnum.REMOVING
+            log = DeploymentLog(deployment_id=deployment.id, action=DeploymentActionEnum.REMOVE, status=DeploymentLogStatusEnum.PENDING)
+            db.add(log)
+            db.commit()
+            remove_deployment_task(deployment_id=deployment.id, log_id=log.id)
     elif action in action_to_speed:
         if (
             port.config.get("egress_limit", 0) != action_to_speed[action]

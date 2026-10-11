@@ -160,6 +160,7 @@ class Mutation:
     delete_server_user: bool = strawberry.field(
         resolver=ServerUser.delete_server_user, permission_classes=[IsSuperUser]
     )
+    set_port_policy: bool = strawberry.field(resolver=Port.set_policy, permission_classes=[IsAdmin])
     apply_port_speed_limits: JSON = strawberry.field(resolver=Port.apply_speed_limits, permission_classes=[IsAdmin])
     add_port: bool = strawberry.field(
         resolver=Port.add_port, permission_classes=[IsAdmin]
