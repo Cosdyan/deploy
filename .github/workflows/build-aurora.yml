@@ -130,12 +130,22 @@ jobs:
           path: stack-frontend
       - name: Build exact patched production images
         run: |
+          python3 -m compileall -q build/backend-overrides tests/live
           cp -R build/backend-overrides/. stack-backend/
           cp -R build/frontend-overrides/. stack-frontend/
           cp build/frontend.Dockerfile stack-frontend/Dockerfile
           cp build/frontend.nginx.conf stack-frontend/nginx.conf
           docker build -t aurora-backend-ci:local stack-backend
           docker build -t aurora-frontend-ci:local stack-frontend
+      - name: Prepare SSH target on the disposable Actions VM
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openssh-server
+          sudo useradd -m -s /bin/bash -G sudo aurora_ci
+          echo 'aurora_ci:ci_ssh_password_123' | sudo chpasswd
+          echo 'aurora_ci ALL=(ALL) NOPASSWD:ALL' | sudo tee /etc/sudoers.d/aurora-ci > /dev/null
+          echo 'PasswordAuthentication yes' | sudo tee /etc/ssh/sshd_config.d/00-aurora-ci.conf > /dev/null
+          sudo systemctl restart ssh
       - name: Deploy complete isolated stack and initialize administrator
         env:
           AURORA_DB_PASSWORD: ci_database_password_123
@@ -144,7 +154,7 @@ jobs:
           set -euo pipefail
           mkdir -p "$HOME/.ssh"
           touch "$HOME/.ssh/id_rsa"
-          printf 'services:\n  backend:\n    image: aurora-backend-ci:local\n  worker:\n    image: aurora-backend-ci:local\n  nginx:\n    image: aurora-frontend-ci:local\n' > ci-compose.yml
+          printf 'services:\n  backend:\n    image: aurora-backend-ci:local\n  worker:\n    image: aurora-backend-ci:local\n    extra_hosts: ["host.docker.internal:host-gateway"]\n  nginx:\n    image: aurora-frontend-ci:local\n' > ci-compose.yml
           docker compose -f docker-compose.yml -f ci-compose.yml up -d
           ready=false
           for i in $(seq 1 90); do
@@ -154,6 +164,7 @@ jobs:
           test "$ready" = true
           docker compose -f docker-compose.yml -f ci-compose.yml exec -T backend python -c 'from app.db.session import db_session; from app.db.crud.user import create_user; from app.db.schemas.user import UserCreate; db=db_session(); session=db.__enter__(); create_user(session,UserCreate(email="admin@example.invalid",password="ci_test_password_123",is_active=True,is_superuser=True)); db.__exit__(None,None,None)'
           python3 tests/live/api.py
+          python3 tests/live/deployment.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

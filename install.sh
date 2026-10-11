@@ -16,7 +16,7 @@ Tip="${Green_font_prefix}[注意]${Font_color_suffix}"
 while [[ $# -ge 1 ]]; do
     case $1 in
         --mirror)
-            FASTGIT="镜像加速"
+            echo -e "${Tip} --mirror 已停用，使用官方 GitHub 下载地址。"
             shift
             ;;
         --dev)
@@ -29,35 +29,18 @@ while [[ $# -ge 1 ]]; do
     esac
 done
 
-if curl --version > /dev/null 2>&1; then
-    if [[ -n $(curl -m 5 -s https://api.ip.sb/geoip | grep "China") ]]; then
-        echo -e "${Tip} 根据 ip.sb 提供的信息，当前 IP 可能在中国"
-        read -e -r -p "是否选用 fastgit 镜像完成安装? [Y/n] " input
-        case $input in
-        [yY][eE][sS] | [yY])
-            echo -e "${Tip} 使用 github 镜像加速 ..."
-            FASTGIT="镜像加速"
-            ;;
-        [nN][oO] | [nN])
-            ;;
-        *)
-            ;;
-        esac
-    fi
-fi
-
 INSTALL_VERSION="1.0.0"
 [[ -z "$HOME" ]] && echo -e "${Error} 家目录检查失败！" && exit 1
 AURORA_HOME="$HOME/aurora"
 AURORA_HOME_BACKUP="$HOME/aurora_backup"
 AURORA_DOCKER_YML=${AURORA_HOME}/docker-compose.yml
 AURORA_DOCKER_YML_TEMP=${AURORA_HOME}/docker-compose.yml.tmp
-[[ -z $FASTGIT ]] && GITHUB_RAW_URL="raw.githubusercontent.com" || GITHUB_RAW_URL="raw.fastgit.org"
+GITHUB_RAW_URL="raw.githubusercontent.com"
 AURORA_GITHUB="Cosdyan"
 AURORA_YML_URL="https://${GITHUB_RAW_URL}/${AURORA_GITHUB}/deploy/main/docker-compose.yml"
 AURORA_DEV_YML_URL="https://${GITHUB_RAW_URL}/${AURORA_GITHUB}/deploy/main/docker-compose-dev.yml"
 DOCKER_INSTALL_URL="https://get.docker.com"
-[[ -z $FASTGIT ]] && GITHUB_URL="github.com" || GITHUB_URL="download.fastgit.org"
+GITHUB_URL="github.com"
 DOCKER_COMPOSE_URL="https://github.com/docker/compose/releases/download/v2.29.7/docker-compose-$(uname -s)-$(uname -m)"
 
 AURORA_DEF_IP=""

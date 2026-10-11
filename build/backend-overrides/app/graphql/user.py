@@ -35,7 +35,7 @@ class User:
     email: str
     first_name: Optional[str]
     last_name: Optional[str]
-        is_active: bool
+    is_active: bool
     is_ops: bool = strawberry.field(permission_classes=[IsSuperUser])
     is_superuser: bool = strawberry.field(permission_classes=[IsSuperUser])
     notes: Optional[str]

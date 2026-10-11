@@ -62,3 +62,20 @@ own=next(x["id"] for x in own if x["email"]=="admin@example.invalid")
 gql('mutation($id:Int!){deleteUser(id:$id)}',{"id":own},fail=True)
 gql('mutation($id:Int!){updateUser(id:$id,isActive:false)}',{"id":own},fail=True)
 print("PASS: login, token refresh, user persistence/search/edit, anonymous/member rejection, targeted server access changes, port CRUD, service CRUD/compile, self-account protections")
+
+# Upload the real GraphQL multipart request; downloaded content must match.
+boundary = "aurora-ci-multipart-boundary"
+operations = {"query":"mutation($file:Upload!){uploadFile(file:$file,type:TEXT,name:\"CI text\"){id path name}}","variables":{"file":None}}
+parts = []
+for name, value in [("operations",json.dumps(operations)),("map",json.dumps({"0":["variables.file"]}))]:
+    parts.append(("--"+boundary+"\r\nContent-Disposition: form-data; name=\""+name+"\"\r\n\r\n"+value+"\r\n").encode())
+parts.append(("--"+boundary+"\r\nContent-Disposition: form-data; name=\"0\"; filename=\"ci.txt\"\r\nContent-Type: text/plain\r\n\r\naurora verified upload\r\n--"+boundary+"--\r\n").encode())
+req=urllib.request.Request(BASE+"/api/graphql",data=b"".join(parts),headers={"Authorization":"Bearer "+admin,"Content-Type":"multipart/form-data; boundary="+boundary})
+with urllib.request.urlopen(req,timeout=20) as r: uploaded=json.load(r)
+assert not uploaded.get("errors"),uploaded
+uploaded=uploaded["data"]["uploadFile"]
+with urllib.request.urlopen(BASE+uploaded["path"]) as r: assert r.read()==b"aurora verified upload"
+gql('mutation($id:Int!){updateFile(id:$id,name:"CI updated",notes:"")}',{"id":uploaded["id"]})
+assert gql('{files(name:"CI updated"){id name}}')["files"][0]["id"]==uploaded["id"]
+gql('mutation($id:Int!){deleteFile(id:$id)}',{"id":uploaded["id"]})
+print("PASS: actual multipart upload, file download/edit/delete")
