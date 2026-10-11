@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:13-alpine
+        image: timescale/timescaledb:2.15.3-pg13
         env:
           POSTGRES_USER: aurora
           POSTGRES_PASSWORD: isolated_test_password
