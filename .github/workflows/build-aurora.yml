@@ -199,6 +199,7 @@ jobs:
           docker compose -f docker-compose.yml -f ci-compose.yml exec -T backend python -c 'from app.db.session import db_session; from app.db.crud.user import create_user; from app.db.schemas.user import UserCreate; db=db_session(); session=db.__enter__(); create_user(session,UserCreate(email="admin@example.invalid",password="ci_test_password_123",is_active=True,is_superuser=True)); db.__exit__(None,None,None)'
           python3 tests/live/api.py
           python3 tests/live/deployment.py
+          python3 tests/live/legacy.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
