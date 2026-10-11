@@ -5,6 +5,7 @@ services:
     restart: always
     command: bash worker.sh
     environment:
+      PYTHONPATH: /app
       ENABLE_SENTRY: 'no'
       DATABASE_URL: 'postgresql://aurora:${AURORA_DB_PASSWORD:?Configure_AURORA_DB_PASSWORD_in_dotenv}@postgres:5432/aurora'
       ASYNC_DATABASE_URL: 'postgresql+asyncpg://aurora:${AURORA_DB_PASSWORD:?Configure_AURORA_DB_PASSWORD_in_dotenv}@postgres:5432/aurora'
@@ -17,9 +18,9 @@ services:
   backend:
     image: ghcr.io/cosdyan/aurora-admin-backend:latest
     restart: always
-    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8888"
+    command: sh -c "alembic upgrade heads && uvicorn app.main:app --host 0.0.0.0 --port 8888"
     environment:
-      PYTHONPATH: .
+      PYTHONPATH: /app
       DATABASE_URL: 'postgresql://aurora:${AURORA_DB_PASSWORD:?Configure_AURORA_DB_PASSWORD_in_dotenv}@postgres:5432/aurora'
       ASYNC_DATABASE_URL: 'postgresql+asyncpg://aurora:${AURORA_DB_PASSWORD:?Configure_AURORA_DB_PASSWORD_in_dotenv}@postgres:5432/aurora'
       ENABLE_SENTRY: 'no'
