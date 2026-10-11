@@ -209,6 +209,7 @@ jobs:
           python3 tests/live/api.py
           python3 tests/live/deployment.py
           python3 tests/live/legacy.py
+          python3 tests/live/policy.py
       - uses: actions/setup-node@v4
         with:
           node-version: '22'

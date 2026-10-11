@@ -114,7 +114,7 @@ const MODAL_REGISTRY: Record<string, ModalDescriptor> = {
   portRestriction: {
     component: PortRestrictionModal,
     validateProps: requireField(["port", "id"]),
-    defaultOptions: {},
+    defaultOptions: {className: "max-h-[90vh] overflow-y-auto"},
   },
   file: {
     component: FileModal,
