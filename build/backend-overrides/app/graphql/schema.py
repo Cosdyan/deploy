@@ -239,17 +239,17 @@ async def count(info: Info, target: int = 1) -> AsyncGenerator[int, None]:
 @strawberry.type
 class Subscription:
     task_stream: AsyncGenerator[JSON, None] = strawberry.subscription(
-        resolver=task_stream, permission_classes=[]
+        resolver=task_stream, permission_classes=[IsAuthenticated]
     )
     task: AsyncGenerator[JSON, None] = strawberry.subscription(
-        resolver=task, permission_classes=[]
+        resolver=task, permission_classes=[IsSuperUser]
     )
     count: AsyncGenerator[int, None] = strawberry.subscription(
         resolver=count, permission_classes=[]
     )
     server_metric: AsyncGenerator[ServerMetricSnapshot | None, None] = (
         strawberry.subscription(
-            resolver=Server.subscribe_metrics, permission_classes=[]
+            resolver=Server.subscribe_metrics, permission_classes=[IsAuthenticated]
         )
     )
     connect_server: AsyncGenerator[JSON, None] = strawberry.subscription(

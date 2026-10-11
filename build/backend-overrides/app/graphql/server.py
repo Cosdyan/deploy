@@ -355,7 +355,7 @@ class Server:
     @staticmethod
     async def connect_server(info: Info, server_id: int) -> AsyncGenerator[JSON, None]:
         user = info.context["request"].state.user
-        if not has_permission_of_server(user, server_id):
+        if not await has_permission_of_server(user, server_id):
             yield {"error": "Permission denied"}
             return
 

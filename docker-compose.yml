@@ -16,7 +16,21 @@ services:
       - app-data:/app/ansible/priv_data_dirs
       - file-data:/app/files
     depends_on:
-      - redis
+      backend:
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8888), timeout=2).close()"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+      start_period: 10s
+        condition: service_healthy
+      redis:
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 40
+        condition: service_healthy
     networks:
       - aurora
       - worker
@@ -36,8 +50,10 @@ services:
       - app-data:/app/ansible/priv_data_dirs
       - file-data:/app/files
     depends_on:
-      - postgres
-      - redis
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - aurora
 
@@ -49,7 +65,8 @@ services:
     ports:
       - 8000:80
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     networks:
       - aurora
 
@@ -62,6 +79,11 @@ services:
       - aurora
 
   postgres:
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U aurora -d aurora"]
+      interval: 3s
+      timeout: 2s
+      retries: 40
     image: timescale/timescaledb:2.15.3-pg13
     command: postgres -c shared_preload_libraries=timescaledb
     restart: always

@@ -158,7 +158,7 @@ jobs:
           docker compose -f docker-compose.yml -f ci-compose.yml up -d
           ready=false
           for i in $(seq 1 90); do
-            if curl -fsS http://127.0.0.1:8000/api >/dev/null; then ready=true; break; fi
+            if curl -fsS http://127.0.0.1:8000/api/graphql -H 'Content-Type: application/json' -d '{"query":"{__typename}"}' | jq -e '.data.__typename == "Query"' >/dev/null; then ready=true; break; fi
             sleep 2
           done
           test "$ready" = true
@@ -178,7 +178,10 @@ jobs:
         env:
           AURORA_DB_PASSWORD: ci_database_password_123
           AURORA_SECRET_KEY: ci_signing_secret_isolated_only
-        run: docker compose -f docker-compose.yml -f ci-compose.yml logs --no-color > isolated-stack.log
+        run: |
+          docker compose -f docker-compose.yml -f ci-compose.yml logs --no-color > isolated-stack.log
+          tail -n 160 isolated-stack.log
+          docker compose -f docker-compose.yml -f ci-compose.yml ps -a
       - uses: actions/upload-artifact@v4
         if: always()
         with:
