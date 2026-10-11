@@ -77,6 +77,24 @@ ip6tables -t nat -A POSTROUTING -s fd00:ea23:9c80:4a54:e242:5f97::/96 -j MASQUER
 - [ ] SysVinit
 - [ ] OpenRC
 
+## Cosdyan Fork — 自动重新编译与部署
+
+此 Fork 的 GitHub Actions 从原作者 [backend](https://github.com/Aurora-Admin-Panel/backend) 和 [frontend](https://github.com/Aurora-Admin-Panel/frontend) 的 `main` 分支检出源码，分别构建 AMD64/ARM64 Docker 镜像，并发布到 GitHub Container Registry：
+
+- `ghcr.io/cosdyan/aurora-admin-backend:latest`
+- `ghcr.io/cosdyan/aurora-admin-frontend:latest`
+
+[查看镜像编译工作流](.github/workflows/build-aurora.yml) · [查看 GitHub Actions](https://github.com/Cosdyan/deploy/actions)
+
+一键安装使用此仓库的配置，而不是原作者仓库：
+
+```bash
+curl -fsSLo aurora-install.sh https://raw.githubusercontent.com/Cosdyan/deploy/main/install.sh
+sudo bash aurora-install.sh
+```
+
+**重要：** 初次执行前需确认 GitHub Actions 编译成功且 GHCR 镜像已发布。当前 Compose 仍包含上游演示用的 PostgreSQL 默认密码，生产使用前必须更换且保持各容器的数据库 URL 同步；脚本的升级、卸载功能可能影响现有数据库，操作前必须备份。重新构建使用原作者当前 `main` 源码，与旧版部署所用镜像可能存在接口差异，尚需实际端到端测试，不建议直接覆盖生产实例。
+
 ## 怎么跑起来？
 
 ## 一键脚本（推荐）
@@ -84,11 +102,11 @@ ip6tables -t nat -A POSTROUTING -s fd00:ea23:9c80:4a54:e242:5f97::/96 -j MASQUER
 目前已支持一键安装、更新（自动同步旧配置）、卸载面板以及备份数据库、添加超级管理员帐号、更换面板端口等操作。**使用一键脚本安装后，如果仍需使用一脚脚本更新，请勿更改数据库用户名和密码，否则会使得更新后无法同步更改后的数据库用户名和密码，导致数据库连接出错。**
 
 ```shell
-bash <(curl -fsSL https://raw.githubusercontent.com/Aurora-Admin-Panel/deploy/main/install.sh)
+bash <(curl -fsSL https://raw.githubusercontent.com/Cosdyan/deploy/main/install.sh)
 # 国内机器安装可以选择使用 fastgit 镜像
 # 但由于拉取 docker 镜像时候默认服务器仍在国外，可能拉取速度较慢
 # 可自行搜索如何配置 Docker Hub 国内镜像加速
-# bash <(curl -fsSL https://raw.fastgit.org/Aurora-Admin-Panel/deploy/main/install.sh) --mirror
+# bash <(curl -fsSL https://raw.fastgit.org/Cosdyan/deploy/main/install.sh) --mirror
 ```
 
 一键脚本默认从 Github 拉取所需的配置文件，如果是在国内机器安装，请检查连接 Github 的网络是否正常。一键脚本也支持更新测试版本，只需要添加 `--dev` 参数执行脚本即可，但是测试版本并不稳定，可能会出现各种问题，不建议在生产环境中使用。
@@ -160,7 +178,7 @@ ssh-keygen -t rsa -b 4096 -C "your_email@example.com"
 ### 4. 安装并启动面板（必须）
 
 ```shell
-mkdir -p ~/aurora && cd ~/aurora && wget https://raw.githubusercontent.com/Aurora-Admin-Panel/deploy/main/docker-compose.yml -O docker-compose.yml && docker-compose up -d
+mkdir -p ~/aurora && cd ~/aurora && wget https://raw.githubusercontent.com/Cosdyan/deploy/main/docker-compose.yml -O docker-compose.yml && docker-compose up -d
 # 创建管理员用户（密码必须设置8位以上，否则无法登陆）
 docker-compose exec backend python app/initial_data.py
 ```
@@ -179,14 +197,14 @@ docker-compose exec backend python app/initial_data.py
 ### 正式版
 ```shell
 cd ~/aurora
-wget https://raw.githubusercontent.com/Aurora-Admin-Panel/deploy/main/docker-compose.yml -O docker-compose.yml
+wget https://raw.githubusercontent.com/Cosdyan/deploy/main/docker-compose.yml -O docker-compose.yml
 docker-compose pull && docker-compose down --remove-orphans && docker-compose up -d
 ```
 
 ### ~~内测版（目前已不维护，请不要使用）~~
 ```shell
 cd ~/aurora
-wget https://raw.githubusercontent.com/Aurora-Admin-Panel/deploy/main/docker-compose-dev.yml -O docker-compose.yml
+wget https://raw.githubusercontent.com/Cosdyan/deploy/main/docker-compose-dev.yml -O docker-compose.yml
 docker-compose pull && docker-compose down --remove-orphans && docker-compose up -d
 ```
 
@@ -220,28 +238,28 @@ docker volume rm aurora_app-data
 
 ### 服务器管理页面
 
-![](https://raw.githubusercontent.com/Aurora-Admin-Panel/deploy/main/img/servers.png)
+![](https://raw.githubusercontent.com/Cosdyan/deploy/main/img/servers.png)
 
 #### 修改/添加服务器
 
-![](https://raw.githubusercontent.com/Aurora-Admin-Panel/deploy/main/img/servers_edit.png)
+![](https://raw.githubusercontent.com/Cosdyan/deploy/main/img/servers_edit.png)
 
 ### 服务器端口管理页面
 
-![](https://raw.githubusercontent.com/Aurora-Admin-Panel/deploy/main/img/server.png)
+![](https://raw.githubusercontent.com/Cosdyan/deploy/main/img/server.png)
 
 #### 添加/编辑端口
 
-![](https://raw.githubusercontent.com/Aurora-Admin-Panel/deploy/main/img/server_port_edit.png)
+![](https://raw.githubusercontent.com/Cosdyan/deploy/main/img/server_port_edit.png)
 
 #### 端口分配页面
 
-![](https://raw.githubusercontent.com/Aurora-Admin-Panel/deploy/main/img/server_port_users.png)
+![](https://raw.githubusercontent.com/Cosdyan/deploy/main/img/server_port_users.png)
 
 #### 端口设置 iptables
 
-![](https://raw.githubusercontent.com/Aurora-Admin-Panel/deploy/main/img/server_port_edit_rule_iptables.png)
+![](https://raw.githubusercontent.com/Cosdyan/deploy/main/img/server_port_edit_rule_iptables.png)
 
 #### 端口设置 gost
 
-![](https://raw.githubusercontent.com/Aurora-Admin-Panel/deploy/main/img/server_port_edit_rule_gost.png)
+![](https://raw.githubusercontent.com/Cosdyan/deploy/main/img/server_port_edit_rule_gost.png)
