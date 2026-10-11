@@ -52,17 +52,18 @@ jobs:
       - name: Run clean PostgreSQL migrations twice (idempotence)
         run: |
           set -euo pipefail
-          for cmd in 'alembic upgrade head' 'alembic current' 'alembic upgrade head'; do
+          for cmd in 'alembic upgrade heads' 'alembic current' 'alembic upgrade heads'; do
             docker run --rm --network host \
               -e DATABASE_URL=postgresql://aurora:isolated_test_password@127.0.0.1:5432/aurora \
               -e ASYNC_DATABASE_URL=postgresql+asyncpg://aurora:isolated_test_password@127.0.0.1:5432/aurora \
               -e REDIS_HOST=127.0.0.1 \
+              -e PYTHONPATH=/app \
               -e ENABLE_SENTRY=no \
               aurora-backend-ci:local sh -c "$cmd"
           done
       - name: Confirm schema migrated
         run: |
-          docker run --rm --network host -e DATABASE_URL=postgresql://aurora:isolated_test_password@127.0.0.1:5432/aurora \
+          docker run --rm --network host -e DATABASE_URL=postgresql://aurora:isolated_test_password@127.0.0.1:5432/aurora -e PYTHONPATH=/app \
             aurora-backend-ci:local python -c "from sqlalchemy import create_engine,text; import os; c=create_engine(os.environ['DATABASE_URL']); assert c.connect().execute(text('select count(*) from alembic_version')).scalar() >= 1"
   build-candidates:
     needs: isolated-tests
