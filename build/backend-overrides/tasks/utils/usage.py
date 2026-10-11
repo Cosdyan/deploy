@@ -101,9 +101,11 @@ def apply_port_limits(db: Session, port: Port, action: LimitActionEnum):
         ):
             port.config["egress_limit"] = action_to_speed[action]
             port.config["ingress_limit"] = action_to_speed[action]
+            port.config["speed_limit_status"] = "queued"
             db.add(port)
             db.commit()
             tc_runner(**{
+                    "port_id": port.id,
                     "server_id": port.server.id,
                     "port_num": port.num,
                     "egress_limit": port.config.get("egress_limit"),
@@ -114,14 +116,14 @@ def apply_port_limits(db: Session, port: Port, action: LimitActionEnum):
 
 
 def check_limits(config: t.Dict, usage: int) -> LimitActionEnum:
-    if config.get(
-        "valid_until"
-    ) and datetime.utcnow() >= datetime.utcfromtimestamp(
-        config.get("valid_until") / 1000
-    ):
-        return LimitActionEnum(config.get("due_action", 0))
-    elif config.get("quota") and usage >= config.get("quota"):
-        return LimitActionEnum(config.get("quota_action", 0))
+    if config.get("valid_until") and datetime.utcnow().timestamp() * 1000 >= config["valid_until"]:
+        action = LimitActionEnum(config.get("due_action", 0))
+        if action != LimitActionEnum.NO_ACTION:
+            return action
+    if config.get("quota") and usage >= config["quota"]:
+        action = LimitActionEnum(config.get("quota_action", 0))
+        if action != LimitActionEnum.NO_ACTION:
+            return action
     return None
 
 

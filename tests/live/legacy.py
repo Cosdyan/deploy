@@ -62,3 +62,30 @@ for rate in [1000,0]:
     assert config["egress_limit"]==rate and config["ingress_limit"]==0,config
 gql("mutation($p:Int!){deletePort(id:$p)}",{"p":pid})
 print("PASS: actual speed-limit API, queued SSH execution, completion status and removal")
+
+# Deadline evaluation must work with no usage row and not mask a quota policy.
+policy_code=r'''
+from datetime import datetime
+from app.db.session import db_session
+from app.db.models import Port, Server
+from tasks.limits import port_limits_runner
+from tasks.utils.usage import check_limits
+from app.db.constants import LimitActionEnum
+assert check_limits({"valid_until":1,"due_action":0,"quota":100,"quota_action":3},100)==LimitActionEnum.SPEED_LIMIT_1M
+assert check_limits({"quota":100,"quota_action":3},99) is None
+assert check_limits({"quota":100,"quota_action":3},100)==LimitActionEnum.SPEED_LIMIT_1M
+with db_session() as db:
+    sid=db.query(Server).filter(Server.name=="CI SSH target").one().id
+    port=Port(server_id=sid,num=18084,config={"valid_until":1,"due_action":3})
+    db.add(port);db.commit();pid=port.id
+port_limits_runner.call_local()
+with db_session() as db:
+    port=db.get(Port,pid)
+    assert port.usage is None
+    assert port.config["egress_limit"]==1000 and port.config["ingress_limit"]==1000,port.config
+    assert port.config["speed_limit_status"] in ("queued","applied"),port.config
+    port.config["valid_until"]=0
+    db.commit()
+print("PASS: expiry without historical traffic, exact quota threshold and independent no-action deadline")
+'''
+subprocess.run(["docker","compose","-f","docker-compose.yml","-f","ci-compose.yml","exec","-T","worker","python","-c",policy_code],check=True)
