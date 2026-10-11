@@ -12,6 +12,9 @@ grep -q 'protocol ip ' <<< "$filters"
 grep -q 'protocol ipv6 ' <<< "$filters"
 grep -q 'ip_proto tcp' <<< "$filters"
 grep -q 'ip_proto udp' <<< "$filters"
+sudo env AURORA_TC_IFACE="$device" bash "$script" -e=3000kbit 65535
+sudo tc class show dev "$device" | grep -q '1:ffff '
+sudo env AURORA_TC_IFACE="$device" bash "$script" 65535
 sudo env AURORA_TC_IFACE="$device" bash "$script" -e=2000kbit 18081
 sudo env AURORA_TC_IFACE="$device" bash "$script" 18080
 sudo tc class show dev "$device" | grep -q 'rate 2Mbit'

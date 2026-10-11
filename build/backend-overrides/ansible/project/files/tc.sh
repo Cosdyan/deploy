@@ -25,6 +25,17 @@ ifb="${AURORA_TC_IFB:-aurora-ifb}"
 ip link show dev "$interface" >/dev/null
 class="$(printf '%x' "$port")"
 
+# Separate EtherTypes use different priorities; 32-bit handles identify ports.
+remove_filters() {
+    local device="$1" parent="$2" family priority slot
+    for family in ip ipv6; do
+        priority=49150; [[ "$family" != ipv6 ]] || priority=49151
+        for slot in 0 1; do
+            tc filter del dev "$device" parent "$parent" protocol "$family" pref "$priority" handle "$((port * 2 + slot))" flower 2>/dev/null || true
+        done
+    done
+}
+
 ensure_root() {
     local device="$1" handle="$2" root
     root="$(tc qdisc show dev "$device")"
@@ -40,7 +51,7 @@ remove_port() {
     local device="$1" handle="$2"
     if ! ip link show dev "$device" >/dev/null 2>&1; then return; fi
     if tc class show dev "$device" | grep -q "class htb $handle:$class "; then
-        tc filter del dev "$device" parent "$handle:" pref "$port" || true
+        remove_filters "$device" "$handle:"
         tc class del dev "$device" classid "$handle:$class"
     fi
 }
@@ -50,8 +61,10 @@ apply_port() {
     remove_port "$device" "$handle"
     tc class replace dev "$device" parent "$handle:" classid "$handle:$class" htb rate "${rate}kbit" ceil "${rate}kbit"
     for family in ip ipv6; do
+        priority=49150; [[ "$family" != ipv6 ]] || priority=49151
         for transport in tcp udp; do
-            tc filter add dev "$device" parent "$handle:" protocol "$family" pref "$port" flower ip_proto "$transport" "${direction}_port" "$port" classid "$handle:$class"
+            slot=0; [[ "$transport" != udp ]] || slot=1
+            tc filter add dev "$device" parent "$handle:" protocol "$family" pref "$priority" handle "$((port * 2 + slot))" flower ip_proto "$transport" "${direction}_port" "$port" classid "$handle:$class"
         done
     done
 }
@@ -70,15 +83,17 @@ if ((ingress > 0)); then
         tc qdisc add dev "$interface" handle ffff: ingress
     fi
     # Each port owns its redirect filters; other inbound traffic is untouched.
-    tc filter del dev "$interface" parent ffff: pref "$port" 2>/dev/null || true
+    remove_filters "$interface" ffff:
     for family in ip ipv6; do
+        priority=49150; [[ "$family" != ipv6 ]] || priority=49151
         for transport in tcp udp; do
-            tc filter add dev "$interface" parent ffff: protocol "$family" pref "$port" flower ip_proto "$transport" dst_port "$port" action mirred egress redirect dev "$ifb"
+            slot=0; [[ "$transport" != udp ]] || slot=1
+            tc filter add dev "$interface" parent ffff: protocol "$family" pref "$priority" handle "$((port * 2 + slot))" flower ip_proto "$transport" dst_port "$port" action mirred egress redirect dev "$ifb"
         done
     done
     apply_port "$ifb" 2 dst "$ingress"
 else
-    tc filter del dev "$interface" parent ffff: pref "$port" 2>/dev/null || true
+    remove_filters "$interface" ffff:
     remove_port "$ifb" 2
 fi
 echo "Port $port traffic control updated"
