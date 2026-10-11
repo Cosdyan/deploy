@@ -6,8 +6,6 @@ from app.db.models.server import Server
 from app.db.models.port_forward import PortForwardRule
 from app.db.crud.port_forward import get_forward_rule
 from app.db.crud.server import get_server
-from tasks.utils.usage import update_traffic
-from tasks.utils.rule import correct_running_services
 
 
 def update_facts(server_id: int, facts: t.Dict, md5: str = None):
@@ -81,10 +79,12 @@ def iptables_finished_handler(
         facts = runner.get_fact_cache(server.host)
         if facts:
             if (traffic := facts.get("traffic", "")) and update_traffic_bool:
+                from tasks.utils.usage import update_traffic
                 update_traffic(
                     server, traffic, accumulate=accumulate
                 )
             if rules := facts.get("rules", ""):
+                from tasks.utils.rule import correct_running_services
                 correct_running_services(server.id, rules)
             if port_id is not None and (
                 facts.get("error") or facts.get("systemd_error")
