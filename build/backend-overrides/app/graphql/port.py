@@ -312,6 +312,29 @@ class Port:
         return result.rowcount > 0
 
     @staticmethod
+    async def apply_speed_limits(info: Info, id: int, egress: int, ingress: int) -> JSON:
+        await require_port_manager(info, port_id=id)
+        if not 0 <= egress <= 1000000000 or not 0 <= ingress <= 1000000000:
+            raise ValueError("Speed limits must be between 0 and 1000000000 Kbit/s")
+        async with async_db_session() as db:
+            port = (await db.execute(select(DBPort).where(DBPort.id == id))).scalars().one()
+            port.config["egress_limit"] = egress
+            port.config["ingress_limit"] = ingress
+            port.config["speed_limit_status"] = "queued"
+            sid, num = port.server_id, port.num
+            await db.commit()
+        from tasks.tc import tc_runner
+        try:
+            task = tc_runner(server_id=sid, port_num=num, egress_limit=egress, ingress_limit=ingress, port_id=id)
+        except Exception:
+            async with async_db_session() as db:
+                port = (await db.execute(select(DBPort).where(DBPort.id == id))).scalars().one()
+                port.config["speed_limit_status"] = "failed"
+                await db.commit()
+            raise
+        return {"status": "queued", "taskId": task.id}
+
+    @staticmethod
     async def delete_port(info: Info, id: int) -> bool:
         await require_port_manager(info, port_id=id)
         from app.db.models import ServerDeployment as DBServerDeployment
