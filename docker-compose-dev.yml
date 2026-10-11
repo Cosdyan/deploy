@@ -43,7 +43,8 @@ services:
     restart: always
 
   postgres:
-    image: postgres:13-alpine
+    image: timescale/timescaledb:2.15.3-pg13
+    command: postgres -c shared_preload_libraries=timescaledb
     restart: always
     environment:
       POSTGRES_USER: aurora
