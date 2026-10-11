@@ -168,20 +168,120 @@ function set_config() {
     [[ -z $DDNS_INTERVAL_SECONDS ]] || sed -i "s/DDNS_INTERVAL_SECONDS:.*$/DDNS_INTERVAL_SECONDS: $DDNS_INTERVAL_SECONDS/" ${AURORA_DOCKER_YML}
 }
 
+# Read or edit only the TCP port 80 mapping of the panel service.
+function panel_port_config() {
+    awk -v action="$1" -v new_port="$2" -v new_ip="$3" '
+    function clean(value) {
+        sub(/[[:space:]]+#.*$/, "", value)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
+        gsub(/["\047]/, "", value)
+        return value
+    }
+    function finish(    value,n,parts,host,port,proto,prefix,i,comment) {
+        if (!first) return
+        port = ""; host = ""; proto = "tcp"
+        if (short_line) {
+            value = clean(lines[short_line])
+            sub(/^-+[[:space:]]*/, "", value)
+            if (value ~ /\/udp$/) proto = "udp"
+            sub(/\/[[:alpha:]]+$/, "", value)
+            n = split(value, parts, ":")
+            if (n >= 2 && parts[n] == "80") {
+                port = parts[n-1]
+                host = substr(value, 1, length(value)-length(port)-length(parts[n])-2)
+            }
+        } else if (target == "80") {
+            port = published; host = host_ip
+            if (protocol != "") proto = protocol
+        }
+        if (port ~ /^[0-9]+$/ && port+0 >= 1 && port+0 <= 65535 && proto == "tcp") {
+            found++
+            if (action == "read") result = port "|" host
+            else if (short_line) {
+                match(lines[short_line], /^[[:space:]]*-[[:space:]]*/)
+                prefix = substr(lines[short_line], 1, RLENGTH)
+                value = new_port ":80"
+                if (new_ip != "") value = new_ip ":" value
+                if (lines[short_line] ~ /\/tcp/) value = value "/tcp"
+                comment = lines[short_line]
+                if (comment ~ /[[:space:]]+#/) sub(/^.*[[:space:]]+#/, " #", comment)
+                else comment = ""
+                lines[short_line] = prefix "\"" value "\"" comment
+            } else {
+                sub(/published:.*/, "published: \"" new_port "\"", lines[published_line])
+                if (host_line) sub(/host_ip:.*/, "host_ip: \"" new_ip "\"", lines[host_line])
+                else if (new_ip != "") {
+                    match(lines[published_line], /^[[:space:]]*/)
+                    prefix = substr(lines[published_line], 1, RLENGTH)
+                    if (lines[published_line] ~ /^[[:space:]]*-/) prefix = prefix "  "
+                    lines[published_line] = lines[published_line] "\n" prefix "host_ip: \"" new_ip "\""
+                }
+            }
+        }
+        first = short_line = published_line = host_line = 0
+        target = published = host_ip = protocol = ""
+    }
+    {
+        lines[NR] = $0
+        if ($0 ~ /^[[:space:]]*($|#)/) next
+        match($0, /^[[:space:]]*/)
+        indent = RLENGTH
+        if (in_ports && indent <= ports_indent) { finish(); in_ports = 0 }
+        if ($0 ~ /^  [[:alnum:]_-]+:[[:space:]]*(#.*)?$/) {
+            service = clean($0); sub(/:.*$/, "", service)
+        }
+        if ((service == "nginx" || service == "frontend") && $0 ~ /^[[:space:]]+ports:[[:space:]]*(#.*)?$/) {
+            in_ports = 1; ports_indent = indent; next
+        }
+        if (!in_ports) next
+        value = clean($0)
+        if (value ~ /^-[[:space:]]*/) {
+            finish(); first = NR
+            sub(/^-[[:space:]]*/, "", value)
+            if (value !~ /^(target|published|host_ip|protocol|mode|name|app_protocol):/) short_line = NR
+        }
+        if (!first || short_line) next
+        key = value; sub(/:.*/, "", key)
+        sub(/^[^:]*:[[:space:]]*/, "", value); value = clean(value)
+        if (key == "target") target = value
+        if (key == "published") { published = value; published_line = NR }
+        if (key == "host_ip") { host_ip = value; host_line = NR }
+        if (key == "protocol") protocol = value
+    }
+    END {
+        finish()
+        if (found != 1) exit 1
+        if (action == "read") print result
+        else for (i = 1; i <= NR; i++) print lines[i]
+    }' "${AURORA_DOCKER_YML}"
+}
+
 function read_port() {
-    IP=$(grep -A 1 port ${AURORA_DOCKER_YML} | grep -Eo "((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)")
-    [[ -z $IP ]] && PORT=$(grep -A 1 port ${AURORA_DOCKER_YML} | grep -Eo "[[:digit:]]+:" | grep -Eo "[[:digit:]]+") || \
-    PORT=$(grep -A 1 port ${AURORA_DOCKER_YML} | grep -Eo ":[[:digit:]]+:" | grep -Eo "[[:digit:]]+")
-    [[ -z $PORT ]] && echo -e "${Error} 未检测到旧端口号，请检查配置文件是否正确！" && exit 1
+    local mapping
+    mapping=$(panel_port_config read) || {
+        echo -e "${Error} 未检测到唯一的面板 TCP 80 映射，请检查配置文件！"
+        return 1
+    }
+    PORT=${mapping%%|*}
+    IP=${mapping#*|}
 }
 
 function set_port() {
-    [[ -z $1 ]] && PORT=${AURORA_DEF_PORT} || PORT=$1
-    NEW_PORT=$(echo $2 | grep -Eo "[[:digit:]]+")
-    [[ -z $NEW_PORT ]] && echo -e "${Error} 未检测到新端口号！" && exit 1
-    [[ -z $IP ]] && sed -i "s/- $PORT:80/- $NEW_PORT:80/" ${AURORA_DOCKER_YML} || \
-    (sed -i "s/- $PORT:80/- $IP:$NEW_PORT:80/" ${AURORA_DOCKER_YML} && \
-    sed -i "s/- $IP:$PORT:80/- $IP:$NEW_PORT:80/" ${AURORA_DOCKER_YML})
+    local new_port=$2 bind_ip=${IP:-} temp_file
+    [[ $new_port =~ ^[0-9]{1,5}$ ]] && ((10#$new_port >= 1 && 10#$new_port <= 65535)) || {
+        echo -e "${Error} 新端口必须是 1-65535 的整数！"
+        return 1
+    }
+    temp_file=$(mktemp "${AURORA_DOCKER_YML}.ports.XXXXXX") || return 1
+    if panel_port_config set "$((10#$new_port))" "$bind_ip" > "$temp_file"; then
+        cat "$temp_file" > "${AURORA_DOCKER_YML}"
+        local status=$?
+        rm -f "$temp_file"
+        return "$status"
+    fi
+    rm -f "$temp_file"
+    echo -e "${Error} 面板端口修改失败，原配置未修改！"
+    return 1
 }
 
 function check_run() {
@@ -194,11 +294,11 @@ function check_run() {
 function change_port() {
     check_install || exit 1
     check_run && exit 1
-    read_port
+    read_port || exit 1
     echo -e "${Info} 旧端口号: $PORT"
     read -r -e -p "请输入新端口: " NEW_PORT
-    set_port $PORT $NEW_PORT
-    read_port
+    set_port "$PORT" "$NEW_PORT" || exit 1
+    read_port || exit 1
     [[ $PORT = $NEW_PORT ]] && cd ${AURORA_HOME} && docker-compose up -d && \
     echo -e "${Info} 端口修改成功！" || echo -e "${Error} 端口修改失败！"
 }
@@ -229,10 +329,20 @@ function install() {
     [[ -n $(docker ps | grep aurora) ]] && echo -e "${Tip} 极光面板已经安装，且正在运行！" && exit 0
     [[ -d ${AURORA_HOME} ]] || mkdir -p ${AURORA_HOME}
     cd ${AURORA_HOME}
-    get_config || exit 1
+    # Capture existing settings before get_config replaces the Compose file.
+    if [[ -f ${AURORA_DOCKER_YML} ]]; then
+        read_config
+        read_port || exit 1
+        get_config || exit 1
+        set_config
+    else
+        IP=${AURORA_DEF_IP}
+        PORT=${AURORA_DEF_PORT}
+        get_config || exit 1
+        read_config
+    fi
+    set_port "${AURORA_DEF_PORT}" "$PORT" || exit 1
     echo "-----------------------------------"
-    read_config
-    read_port
     echo_config
     echo "-----------------------------------"
     [[ ! -d "$HOME"/.ssh ]] && mkdir -p "$HOME"/.ssh
@@ -248,12 +358,12 @@ function update() {
     echo -e "${Info} 同步旧配置文件中 ..."
     echo "-----------------------------------"
     read_config
-    read_port
+    read_port || exit 1
     echo_config
     echo "-----------------------------------"
     get_config || exit 1
     set_config
-    set_port ${AURORA_DEF_PORT} $PORT
+    set_port "${AURORA_DEF_PORT}" "$PORT" || exit 1
     echo -e "${Info} 同步新配置文件完成！"
     [[ -z $(docker ps | grep aurora | grep postgres) ]] && \
         echo -e "${Error} 请先运行极光面板，以保证更新前完成自动备份旧数据库！" && exit 1 || \

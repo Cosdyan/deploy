@@ -21,6 +21,8 @@ jobs:
           bash -n install.sh
           test -s build/frontend.Dockerfile
           test -s build/frontend.nginx.conf
+      - name: Test installer port parsing and installation flow
+        run: bash tests/installer-ports.sh
       - name: Validate Compose files
         env:
           AURORA_DB_PASSWORD: isolated_test_password
