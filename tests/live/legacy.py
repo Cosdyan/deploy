@@ -86,6 +86,27 @@ with db_session() as db:
     assert port.config["speed_limit_status"] in ("queued","applied"),port.config
     port.config["valid_until"]=0
     db.commit()
-print("PASS: expiry without historical traffic, exact quota threshold and independent no-action deadline")
+import time
+deadline=time.monotonic()+180
+while time.monotonic()<deadline:
+    with db_session() as db:
+        port=db.get(Port,pid)
+        state=port.config.get("speed_limit_status")
+        assert state!="failed",port.config
+        if state=="applied":break
+    time.sleep(2)
+else:raise AssertionError("Deadline policy did not apply real traffic control")
+from tasks.tc import tc_runner
+with db_session() as db:
+    port=db.get(Port,pid)
+    port.config["egress_limit"]=0
+    port.config["ingress_limit"]=0
+    db.commit()
+tc_runner.call_local(server_id=sid,port_num=18084,egress_limit=0,ingress_limit=0,port_id=pid)
+with db_session() as db:
+    port=db.get(Port,pid)
+    assert port.config["speed_limit_status"]=="applied"
+    db.delete(port);db.commit()
+print("PASS: expiry without historical traffic, actual ingress/egress policy application and removal, exact quota threshold and independent no-action deadline")
 '''
 subprocess.run(["docker","compose","-f","docker-compose.yml","-f","ci-compose.yml","exec","-T","worker","python","-c",policy_code],check=True)

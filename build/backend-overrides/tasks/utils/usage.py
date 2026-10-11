@@ -1,6 +1,7 @@
 import re
 import typing as t
 from datetime import datetime
+from time import time
 from collections import defaultdict
 from sqlalchemy.orm import Session
 
@@ -116,7 +117,7 @@ def apply_port_limits(db: Session, port: Port, action: LimitActionEnum):
 
 
 def check_limits(config: t.Dict, usage: int) -> LimitActionEnum:
-    if config.get("valid_until") and datetime.utcnow().timestamp() * 1000 >= config["valid_until"]:
+    if config.get("valid_until") and time() * 1000 >= config["valid_until"]:
         action = LimitActionEnum(config.get("due_action", 0))
         if action != LimitActionEnum.NO_ACTION:
             return action
