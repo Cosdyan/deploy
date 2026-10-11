@@ -102,9 +102,9 @@ done
     read_config() { :; }
     echo_config() { [[ $PORT == 8000 && -z $IP ]]; }
     read_port() { echo 'Fresh install attempted to read an old port' >&2; exit 1; }
-    # Avoid touching the real home .ssh directory in the installer.
-    HOME="$test_dir/home"
-    mkdir -p "$HOME"
+    # Stub SSH setup so the real home directory is never changed.
+    mkdir() { [[ $* == *".ssh"* ]] || command mkdir "$@"; }
+    touch() { :; }
     install
 )
 # Reinstall captures old settings before the download replaces them.
@@ -120,7 +120,8 @@ done
     read_config() { :; }
     set_config() { :; }
     echo_config() { read_port; [[ $PORT == 18080 && $IP == 127.0.0.1 ]]; }
-    HOME="$test_dir/home"
+    mkdir() { [[ $* == *".ssh"* ]] || command mkdir "$@"; }
+    touch() { :; }
     install
 )
 echo 'Installer port and installation regression tests passed'

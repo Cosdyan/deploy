@@ -170,7 +170,7 @@ function set_config() {
 
 # Read or edit only the TCP port 80 mapping of the panel service.
 function panel_port_config() {
-    awk -v action="$1" -v new_port="$2" -v new_ip="$3" '
+    awk -v action="$1" -v new_port="${2:-}" -v new_ip="${3:-}" '
     function clean(value) {
         sub(/[[:space:]]+#.*$/, "", value)
         gsub(/^[[:space:]]+|[[:space:]]+$/, "", value)
