@@ -17,25 +17,20 @@ services:
       - file-data:/app/files
     depends_on:
       backend:
-    healthcheck:
-      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8888), timeout=2).close()"]
-      interval: 5s
-      timeout: 3s
-      retries: 40
-      start_period: 10s
         condition: service_healthy
       redis:
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 3s
-      timeout: 2s
-      retries: 40
         condition: service_healthy
     networks:
       - aurora
       - worker
 
   backend:
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; socket.create_connection(('127.0.0.1', 8888), timeout=2).close()"]
+      interval: 5s
+      timeout: 3s
+      retries: 40
+      start_period: 10s
     image: ghcr.io/cosdyan/aurora-admin-backend:latest
     restart: always
     command: sh -c "alembic upgrade heads && uvicorn app.main:app --host 0.0.0.0 --port 8888"
@@ -71,6 +66,11 @@ services:
       - aurora
 
   redis:
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      timeout: 2s
+      retries: 40
     image: redis
     restart: always
     environment:

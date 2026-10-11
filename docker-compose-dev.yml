@@ -35,7 +35,8 @@ services:
       - app-data:/app/ansible/priv_data_dirs
       - file-data:/app/files
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
 
   nginx:
     image: ghcr.io/cosdyan/aurora-admin-frontend:latest
