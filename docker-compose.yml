@@ -7,8 +7,8 @@ services:
     environment:
       TZ: 'Asia/Shanghai'
       ENABLE_SENTRY: 'no'
-      DATABASE_URL: 'postgresql://aurora:AuroraAdminPanel321@postgres:5432/aurora'
-      ASYNC_DATABASE_URL: 'postgresql+asyncpg://aurora:AuroraAdminPanel321@postgres:5432/aurora'
+      DATABASE_URL: 'postgresql://aurora:${AURORA_DB_PASSWORD:?Configure_AURORA_DB_PASSWORD_in_dotenv}@postgres:5432/aurora'
+      ASYNC_DATABASE_URL: 'postgresql+asyncpg://aurora:${AURORA_DB_PASSWORD:?Configure_AURORA_DB_PASSWORD_in_dotenv}@postgres:5432/aurora'
       TRAFFIC_INTERVAL_SECONDS: 600
       DDNS_INTERVAL_SECONDS: 120
     volumes:
@@ -27,10 +27,10 @@ services:
     environment:
       TZ: 'Asia/Shanghai'
       PYTHONPATH: .
-      DATABASE_URL: 'postgresql://aurora:AuroraAdminPanel321@postgres:5432/aurora'
-      ASYNC_DATABASE_URL: 'postgresql+asyncpg://aurora:AuroraAdminPanel321@postgres:5432/aurora'
+      DATABASE_URL: 'postgresql://aurora:${AURORA_DB_PASSWORD:?Configure_AURORA_DB_PASSWORD_in_dotenv}@postgres:5432/aurora'
+      ASYNC_DATABASE_URL: 'postgresql+asyncpg://aurora:${AURORA_DB_PASSWORD:?Configure_AURORA_DB_PASSWORD_in_dotenv}@postgres:5432/aurora'
       ENABLE_SENTRY: 'no'
-      SECRET_KEY: 'AuroraAdminPanel321'
+      SECRET_KEY: ${AURORA_SECRET_KEY:?Configure_AURORA_SECRET_KEY_in_dotenv}
     volumes:
       - app-data:/app/ansible/priv_data_dirs
     depends_on:
@@ -65,7 +65,7 @@ services:
     environment:
       TZ: 'Asia/Shanghai'
       POSTGRES_USER: aurora
-      POSTGRES_PASSWORD: AuroraAdminPanel321
+      POSTGRES_PASSWORD: ${AURORA_DB_PASSWORD:?Configure_AURORA_DB_PASSWORD_in_dotenv}
       POSTGRES_DB: aurora
     volumes:
       - db-data:/var/lib/postgresql/data
