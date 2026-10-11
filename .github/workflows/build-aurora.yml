@@ -123,6 +123,8 @@ jobs:
             -e ASYNC_DATABASE_URL=postgresql+asyncpg://aurora:isolated_test_password@127.0.0.1:5432/aurora \
             -e REDIS_HOST=127.0.0.1 -e PYTHONPATH=/app -e ENABLE_SENTRY=no \
             aurora-backend-ci:local python -c "import app.main; from tasks import app_runner, rule_runner, tc_runner, clean_port_no_update_runner; print('Backend and restored task imports passed')"
+      - name: Verify real traffic control on disposable dummy interface
+        run: bash tests/traffic-control.sh
       - name: Verify isolated Redis connectivity
         run: test "$(docker run --rm --network host redis:7-alpine redis-cli -h 127.0.0.1 ping)" = PONG
   frontend-regression:
