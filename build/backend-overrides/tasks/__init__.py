@@ -24,3 +24,5 @@ from tasks.port import clean_port_no_update_runner
 from tasks.tc import tc_runner
 
 from tasks.limits import port_limits_runner
+
+from tasks.meter import collect_port_traffic, collect_all_port_traffic
