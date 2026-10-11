@@ -5,6 +5,8 @@ on:
     paths:
       - .github/workflows/build-aurora.yml
       - build/**
+      - tests/**
+      - install.sh
       - docker-compose.yml
       - docker-compose-dev.yml
   workflow_dispatch:
