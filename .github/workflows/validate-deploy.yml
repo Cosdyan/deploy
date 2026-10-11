@@ -22,6 +22,9 @@ jobs:
           test -s build/frontend.Dockerfile
           test -s build/frontend.nginx.conf
       - name: Validate Compose files
+        env:
+          AURORA_DB_PASSWORD: isolated_test_password
+          AURORA_SECRET_KEY: isolated_test_secret
         run: |
           docker compose -f docker-compose.yml config --quiet
           docker compose -f docker-compose-dev.yml config --quiet
