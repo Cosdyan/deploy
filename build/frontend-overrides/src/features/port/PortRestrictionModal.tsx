@@ -39,9 +39,9 @@ export default function PortRestrictionModal({modalProps={},close,resolve}:Props
    <label className="block text-sm">下载限速<Input type="number" min={0} max={1000000000} value={ingress} onChange={e=>setIngress(e.target.value)}/></label>
    <div className="border-t pt-4 space-y-3">
     <label className="block text-sm">到期时间<Input type="datetime-local" value={expires} onChange={e=>setExpires(e.target.value)}/></label>
-    <label className="block text-sm">到期后操作<select className="mt-1 w-full rounded-md border bg-background p-2" value={dueAction} onChange={e=>setDueAction(e.target.value)}>{ACTIONS.map((label,value)=><option key={value} value={value}>{label}</option>)}</select></label>
+    <label className="block text-sm">到期后操作<select aria-label="到期后操作" className="mt-1 w-full rounded-md border bg-background p-2" value={dueAction} onChange={e=>setDueAction(e.target.value)}>{ACTIONS.map((label,value)=><option key={value} value={value}>{label}</option>)}</select></label>
     <label className="block text-sm">流量配额（GiB，0 表示不限）<Input type="number" min={0} step="0.01" value={quota} onChange={e=>setQuota(e.target.value)}/></label>
-    <label className="block text-sm">配额用尽后操作<select className="mt-1 w-full rounded-md border bg-background p-2" value={quotaAction} onChange={e=>setQuotaAction(e.target.value)}>{ACTIONS.map((label,value)=><option key={value} value={value}>{label}</option>)}</select></label>
+    <label className="block text-sm">配额用尽后操作<select aria-label="配额用尽后操作" className="mt-1 w-full rounded-md border bg-background p-2" value={quotaAction} onChange={e=>setQuotaAction(e.target.value)}>{ACTIONS.map((label,value)=><option key={value} value={value}>{label}</option>)}</select></label>
    </div>
    {message&&<p role="status" className="text-sm">{message}</p>}
    {status&&<p role="status" className="text-sm">{status==="applied"?"限速已生效":status==="failed"?"限速执行失败，请查看任务日志":"正在应用限速…"}</p>}
