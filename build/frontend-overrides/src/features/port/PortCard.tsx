@@ -63,6 +63,7 @@ const PortCard = ({ port, onUpdate, setSelected }: PortCardProps) => {
           <Button
             variant="ghost"
             size="icon-xs"
+            aria-label={`端口 ${port.num} 操作`}
             onClick={() =>
               setSelected({ type: "select", id: port.id, port: port })
             }
