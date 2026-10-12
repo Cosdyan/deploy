@@ -42,6 +42,7 @@ test('real deployed workspace: user CRUD, server modal, pages and mobile layout'
 });
 
 test('port policy survives save, page reload and reopening on mobile', async ({page}) => {
+ page.setDefaultTimeout(10000);
  const errors=[]; page.on('pageerror',e=>errors.push(e.message));
  const login=await page.request.post('/api/token',{form:{username:'admin@example.invalid',password:'ci_test_password_123'}});
  expect(login.ok()).toBeTruthy(); const {access_token}=await login.json();
@@ -79,5 +80,5 @@ test('port policy survives save, page reload and reopening on mobile', async ({p
   await expect(dialog.getByLabel('流量配额（GiB，0 表示不限）')).toHaveValue('2.5');
   await expect(dialog.getByLabel('配额用尽后操作',{exact:true})).toHaveValue('8');
   expect(errors).toEqual([]);
- } finally {await gql('mutation($id:Int!){deletePort(id:$id)}',{id:pid});}
+ } catch(error) {console.error('Port policy failure at',page.url(),error); console.error('Page content:',await page.locator('body').innerText().catch(()=>'<unavailable>')); throw error;} finally {try {await gql('mutation($id:Int!){deletePort(id:$id)}',{id:pid});} catch(cleanupError) {console.warn('Port cleanup failed:',String(cleanupError));}}
 });
