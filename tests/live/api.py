@@ -123,3 +123,6 @@ gql('mutation($id:Int!){updateFile(id:$id,name:"CI updated",notes:"")}',{"id":up
 assert gql('{files(name:"CI updated"){id name}}')["files"][0]["id"]==uploaded["id"]
 gql('mutation($id:Int!){deleteFile(id:$id)}',{"id":uploaded["id"]})
 print("PASS: actual multipart upload, file download/edit/delete")
+
+assert gql("{portForwardRule(portId:2147483647){id}}")["portForwardRule"] is None
+print("PASS: forwarding rule query executes with async session and returns no absent rule")

@@ -33,8 +33,11 @@ class PortForwardRule:
     async def get_port_forward_rule(
         info: Info, port_id: int
     ) -> "PortForwardRule":
+        from .port import visible_ports
+        allowed = visible_ports(select(DBPort.id), info.context["request"].state.user)
         stmt = select(DBPortForwardRule).where(
-            DBPortForwardRule.port_id == port_id
+            DBPortForwardRule.port_id == port_id,
+            DBPortForwardRule.port_id.in_(allowed),
         )
 
         async with async_db_session() as async_db:
