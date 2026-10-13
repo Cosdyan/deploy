@@ -129,6 +129,8 @@ jobs:
         run: docker run --rm --network host -v "$PWD/tests/ddns.py:/tmp/aurora-ddns-test.py:ro" -e DATABASE_URL=postgresql://aurora:isolated_test_password@127.0.0.1:5432/aurora -e REDIS_HOST=127.0.0.1 -e PYTHONPATH=/app aurora-backend-ci:local python /tmp/aurora-ddns-test.py
       - name: Verify DNS resolution against disposable local UDP server
         run: docker run --rm -v "$PWD/tests/dns.py:/tmp/aurora-dns-test.py:ro" -e PYTHONPATH=/app aurora-backend-ci:local python /tmp/aurora-dns-test.py
+      - name: Verify forwarding input validation and firewall preservation
+        run: bash tests/iptables-validation.sh
       - name: Verify real traffic control on disposable dummy interface
         run: bash tests/traffic-control.sh
       - name: Verify isolated Redis connectivity
