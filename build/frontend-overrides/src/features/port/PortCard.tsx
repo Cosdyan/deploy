@@ -7,6 +7,9 @@ import {
   ArrowDown,
   ArrowUp,
   CheckCircle,
+  Circle,
+  AlertCircle,
+  LoaderCircle,
   List,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -53,6 +56,15 @@ const PortCard = ({ port, onUpdate, setSelected }: PortCardProps) => {
   const { open } = useModal();
   const {serverId} = useParams();
 
+  const ruleStatus = port.forwardRule?.status?.toLowerCase() || "";
+  const succeeded = ["successful", "success", "completed", "applied"].includes(ruleStatus);
+  const failed = ["failed", "error", "canceled", "cancelled"].includes(ruleStatus);
+  const pending = ["queued", "pending", "running", "deploying"].includes(ruleStatus);
+  const statusLabel = !port.forwardRule ? "尚未部署" : succeeded ? "部署成功" : failed ? "部署失败" : pending ? "部署进行中" : "部署状态未知";
+  const editFunction = async () => {
+    const result = await open("portFunction", { port, serverId: Number(serverId) });
+    if (result) onUpdate();
+  };
   return (
     <div className="relative flex h-44 w-40 flex-col justify-self-center rounded-xl border border-primary bg-card shadow-xl">
       <div className="flex flex-col gap-2 px-4 py-4">
@@ -70,7 +82,12 @@ const PortCard = ({ port, onUpdate, setSelected }: PortCardProps) => {
           >
             <List size={16} />
           </Button>
-          <CheckCircle size={20} className="text-primary" />
+          <span role="status" aria-label={statusLabel} title={statusLabel}>
+            {succeeded ? <CheckCircle size={20} className="text-emerald-600" /> :
+              failed ? <AlertCircle size={20} className="text-destructive" /> :
+              pending ? <LoaderCircle size={20} className="text-muted-foreground" /> :
+              <Circle size={20} className="text-muted-foreground" />}
+          </span>
         </h2>
         <div className="flex grow flex-col items-center justify-start space-y-2">
           <div className="flex w-full flex-row items-start justify-start space-x-2">
@@ -105,7 +122,11 @@ const PortCard = ({ port, onUpdate, setSelected }: PortCardProps) => {
                 variant="secondary"
                 className="max-w-16 cursor-pointer truncate px-1 text-xs"
                 title={port.forwardRule.method}
-                onClick={() => open("portFunction", { port, serverId: Number(serverId) })}
+                role="button"
+                tabIndex={0}
+                aria-label={`配置端口 ${port.num} 功能`}
+                onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); void editFunction(); } }}
+                onClick={editFunction}
               >
                 {port.forwardRule.method}
               </Badge>
@@ -113,7 +134,11 @@ const PortCard = ({ port, onUpdate, setSelected }: PortCardProps) => {
               <Badge
                 variant="outline"
                 className="w-8 cursor-pointer px-1 text-xs"
-                onClick={() => open("portFunction", { port, serverId: Number(serverId) })}
+                role="button"
+                tabIndex={0}
+                aria-label={`配置端口 ${port.num} 功能`}
+                onKeyDown={event => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); void editFunction(); } }}
+                onClick={editFunction}
               >
                 <Plus size={12} />
               </Badge>
