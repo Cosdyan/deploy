@@ -1,7 +1,8 @@
 const { test, expect } = require('@playwright/test');
 
+for (const sshPort of ['', '1', '22', '7118', '65535']) {
 for (const withKey of [false, true]) {
-  test('add server dialog works and submits valid SSH key data: ' + withKey, async ({ page }) => {
+  test('add server dialog works and submits valid SSH key data: ' + withKey + ', SSH port: ' + (sshPort || 'default'), async ({ page }) => {
     const errors = [];
     const submissions = [];
     page.on('pageerror', error => errors.push(error.message));
@@ -51,10 +52,20 @@ for (const withKey of [false, true]) {
     }
     await dialog.locator('input[type="text"]').first().fill('Validation server');
     await dialog.getByPlaceholder('www.example.com').fill('example.invalid');
+    const portInput = dialog.locator('input[type="number"]');
+    for (const invalidPort of ['0', '-1', '65536', '1.5']) {
+      await portInput.fill(invalidPort);
+      await dialog.getByRole('button', { name: 'Add', exact: true }).click();
+      await expect(dialog.getByRole('alert')).toHaveText('SSH port must be between 1 and 65535');
+      expect(submissions).toHaveLength(0);
+    }
+    await portInput.fill(sshPort);
     await dialog.getByRole('button', { name: 'Add', exact: true }).click();
     await expect(dialog).not.toBeVisible();
     expect(submissions).toHaveLength(1);
     expect(submissions[0]).not.toHaveProperty('keyFileId');
+    if (sshPort) expect(submissions[0].port).toBe(Number(sshPort));
+    else expect(submissions[0]).not.toHaveProperty('port');
     expect(errors).toEqual([]);
     // Reopen after submission, choose a real key, and ensure the API receives its numeric ID.
     await page.getByRole('button', { name: 'Add Server', exact: true }).first().click();
@@ -73,4 +84,5 @@ for (const withKey of [false, true]) {
     }
     expect(errors).toEqual([]);
   });
+}
 }
