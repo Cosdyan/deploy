@@ -86,9 +86,9 @@ const ServerList = () => {
     });
     return () => sub.unsubscribe();
   }, [client]);
-  const { data, loading, error, refetch } = useQuery(
+  const { data, previousData, loading, error, refetch } = useQuery(
     GET_SERVERS_QUERY,
-    { variables: { limit, offset } }
+    { variables: { limit, offset }, notifyOnNetworkStatusChange: true }
   );
 
   const setLimit = useCallback((value: number) => {
@@ -96,10 +96,11 @@ const ServerList = () => {
     setQueryLimit(value);
   }, [setAtomLimit, setQueryLimit]);
 
-  const servers = data?.paginatedServers?.items ?? [];
-  const count = data?.paginatedServers?.count ?? 0;
+  const displayedData = data ?? previousData;
+  const servers = displayedData?.paginatedServers?.items ?? [];
+  const count = displayedData?.paginatedServers?.count ?? 0;
 
-  if (error) return <Error error={error} />;
+  if (error && !displayedData) return <Error error={error} />;
 
   return (
     <>
@@ -114,8 +115,9 @@ const ServerList = () => {
       />
 
       <div className="my-5 grid grid-cols-1 gap-3 sm:grid-cols-3">{[[t("Registered servers"), count], [t("Displayed servers"), servers.length], [t("Online now"), servers.filter((s: {id:number}) => metricsMap[s.id]?.isOnline).length]].map(([label, value]) => <div key={String(label)} className="aurora-panel p-5"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-2 text-3xl font-semibold">{value}</p></div>)}</div>
-      <div className="aurora-panel overflow-hidden">
-        {loading ? (
+      <div className="aurora-panel overflow-hidden" aria-busy={loading}>
+        {error && <div role="alert" className="p-4 text-destructive">{error.message}</div>}
+        {loading && !displayedData ? (
           <div className="p-6 space-y-4">
             {Array.from({ length: 5 }).map((_, i) => (
               <Skeleton key={i} className="h-16 w-full rounded-lg" />

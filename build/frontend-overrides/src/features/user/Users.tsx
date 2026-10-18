@@ -23,13 +23,14 @@ export default function Users() {
   const [offset, setOffset] = useState(0);
   const [editing, setEditing] = useState<Account | null>(null);
   const [message, setMessage] = useState("");
-  const { data, loading, error, refetch } = useQuery(LIST, {variables: {email: search || null, limit: 10, offset}, fetchPolicy: "network-only"});
+  const { data, previousData, networkStatus, loading, error, refetch } = useQuery(LIST, {variables: {email: search || null, limit: 10, offset}, fetchPolicy: "network-only", notifyOnNetworkStatusChange: true});
   const [create, creating] = useMutation(CREATE);
   const [update, updating] = useMutation(UPDATE);
   const [remove, removing] = useMutation(DELETE);
   const busy = creating.loading || updating.loading || removing.loading;
-  const accounts: Account[] = data?.paginatedUsers?.items ?? [];
-  const count = data?.paginatedUsers?.count ?? 0;
+  const displayedData = data ?? (networkStatus === 4 ? previousData : undefined);
+  const accounts: Account[] = displayedData?.paginatedUsers?.items ?? [];
+  const count = displayedData?.paginatedUsers?.count ?? 0;
   const selfId = auth.permissions && auth.permissions.user_id;
   async function save(e: FormEvent) {
     e.preventDefault();
@@ -51,8 +52,8 @@ export default function Users() {
     <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="aurora-eyebrow">{t("Access management")}</p><h1 className="text-3xl font-semibold tracking-tight">{t("Users")}</h1><p className="mt-2 text-sm text-muted-foreground">{t("Manage user roles and account access")}</p></div><Button onClick={() => {setMessage(""); setEditing({...empty});}}>{t("Add user")}</Button></div>
     <Input aria-label={t("Search email")} placeholder={t("Search email")} value={search} onChange={e => {setSearch(e.target.value); setOffset(0);}} className="max-w-sm" />
     {(error || (message && !editing)) && <p role="alert" className="text-destructive">{error?.message || message}</p>}
-    <div className="aurora-panel overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b text-left text-muted-foreground">{["Email", "Role", "Status", "Notes", "Actions"].map(x => <th key={x} className="p-4 font-medium">{t(x)}</th>)}</tr></thead><tbody>
-      {loading ? <tr><td colSpan={5} className="p-8">{t("Loading")}…</td></tr> : accounts.map(account => <tr key={account.id} className="border-b last:border-0"><td className="p-4 font-medium">{account.email}</td><td className="p-4">{t(account.isSuperuser ? "Administrator" : account.isOps ? "Operator" : "Member")}</td><td className="p-4"><span className={account.isActive ? "text-emerald-600" : "text-muted-foreground"}>{t(account.isActive ? "Active" : "Disabled")}</span></td><td className="max-w-xs truncate p-4">{account.notes}</td><td className="p-4 whitespace-nowrap"><Button variant="ghost" onClick={() => {setMessage(""); setEditing({...account, password: "", notes: account.notes || ""});}}>{t("Edit")}</Button><Button variant="ghost" disabled={busy || account.id === selfId} onClick={() => deleteAccount(account)}>{t("Delete")}</Button></td></tr>)}
+    <div className="aurora-panel overflow-x-auto" aria-busy={loading}><table className="w-full text-sm"><thead><tr className="border-b text-left text-muted-foreground">{["Email", "Role", "Status", "Notes", "Actions"].map(x => <th key={x} className="p-4 font-medium">{t(x)}</th>)}</tr></thead><tbody>
+      {loading && !displayedData ? <tr><td colSpan={5} className="p-8">{t("Loading")}…</td></tr> : accounts.map(account => <tr key={account.id} className="border-b last:border-0"><td className="p-4 font-medium">{account.email}</td><td className="p-4">{t(account.isSuperuser ? "Administrator" : account.isOps ? "Operator" : "Member")}</td><td className="p-4"><span className={account.isActive ? "text-emerald-600" : "text-muted-foreground"}>{t(account.isActive ? "Active" : "Disabled")}</span></td><td className="max-w-xs truncate p-4">{account.notes}</td><td className="p-4 whitespace-nowrap"><Button variant="ghost" onClick={() => {setMessage(""); setEditing({...account, password: "", notes: account.notes || ""});}}>{t("Edit")}</Button><Button variant="ghost" disabled={busy || account.id === selfId} onClick={() => deleteAccount(account)}>{t("Delete")}</Button></td></tr>)}
       {!loading && !accounts.length && <tr><td colSpan={5} className="p-10 text-center text-muted-foreground">{t("No matching users")}</td></tr>}
     </tbody></table></div>
     <div className="flex items-center justify-between text-sm text-muted-foreground"><span>{t("Total users", {count})}</span><div className="flex gap-2"><Button variant="outline" disabled={!offset || loading} onClick={() => setOffset(offset - 10)}>{t("Previous")}</Button><Button variant="outline" disabled={offset + 10 >= count || loading} onClick={() => setOffset(offset + 10)}>{t("Next")}</Button></div></div>
