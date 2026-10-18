@@ -56,7 +56,7 @@ for (const withKey of [false, true]) {
     for (const invalidPort of ['0', '-1', '65536', '1.5']) {
       await portInput.fill(invalidPort);
       await dialog.getByRole('button', { name: 'Add', exact: true }).click();
-      await expect(dialog.getByRole('alert')).toHaveText('SSH port must be between 1 and 65535');
+      await expect(dialog.getByRole('alert')).toHaveText(/^(SSH port must be between 1 and 65535|SSH 端口必须是 1–65535 的整数)$/);
       expect(submissions).toHaveLength(0);
     }
     await portInput.fill(sshPort);
