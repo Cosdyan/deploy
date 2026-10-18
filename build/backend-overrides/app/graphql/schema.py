@@ -11,6 +11,7 @@ from .auth import IsAuthenticated, IsAdmin, IsSuperUser, EnsureUser
 from .file import File
 from .port import Port, PortUser
 from .port_forward import PortForwardRule
+from .forwarding import configure_native_forward
 from .server import Server, ServerUser
 from .user import User
 from .metric import (
@@ -126,6 +127,7 @@ class Query:
 
 @strawberry.type
 class Mutation:
+    configure_native_forward: JSON = strawberry.field(resolver=configure_native_forward, permission_classes=[IsAdmin])
     create_user: User = strawberry.field(resolver=User.create_user, permission_classes=[IsSuperUser])
     update_user: bool = strawberry.field(
         resolver=User.update_user, permission_classes=[IsSuperUser]

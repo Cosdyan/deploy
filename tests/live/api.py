@@ -126,3 +126,6 @@ print("PASS: actual multipart upload, file download/edit/delete")
 
 assert gql("{portForwardRule(portId:2147483647){id}}")["portForwardRule"] is None
 print("PASS: forwarding rule query executes with async session and returns no absent rule")
+
+gql('mutation{configureNativeForward(portId:2147483647,remoteAddress:"192.0.2.1",remotePort:80)}',fail=True)
+print("PASS: native forwarding rejects a nonexistent managed port")
