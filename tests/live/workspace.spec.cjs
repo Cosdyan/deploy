@@ -63,6 +63,11 @@ test('port policy survives save, page reload and reopening on mobile', async ({p
  try {
   await page.setViewportSize({width:390,height:844});
   await page.goto('/app/servers/'+sid+'/ports');
+  // A newly created port must not claim deployment success.
+  const portHeader=page.getByRole('button',{name:'端口 18087 操作',exact:true}).locator('..');
+  await expect(portHeader.getByRole('status')).toHaveAttribute('aria-label','尚未部署');
+  const functionControl=page.getByRole('button',{name:'配置端口 18087 功能',exact:true});
+  await expect(functionControl).toHaveAttribute('tabindex','0');
   await openPolicy(); const dialog=page.getByRole('dialog');
   await expect(dialog.getByLabel('流量配额（GiB，0 表示不限）')).toHaveValue('0');
   await dialog.getByLabel('到期时间',{exact:true}).fill('2028-01-01T12:30');
