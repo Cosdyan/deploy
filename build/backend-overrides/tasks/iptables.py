@@ -102,13 +102,14 @@ def iptables_reset_runner(
 
 
 @huey.periodic_task(crontab(minute="*"))
-def ddns_runner():
+def ddns_runner(force: bool = False):
     from time import time
     interval = max(1, int(DDNS_INTERVAL_SECONDS) // 60)
-    if (int(time()) // 60) % interval:
-        return
+    if not force and (int(time()) // 60) % interval:
+        return {"status": "not_due", "checked": 0, "queued": 0}
     with db_session() as db:
         rules = get_all_ddns_rules(db)
+    queued = 0
     for rule in rules:
         if (
             rule.config.get("remote_address")
@@ -121,6 +122,7 @@ def ddns_runner():
                     f"DNS changed for address {rule.config['remote_address']}, "
                     + f"{rule.config['remote_ip']}->{updated_ip}"
                 )
+                queued += 1
                 if rule.method == MethodEnum.IPTABLES:
                     iptables_runner(
                         rule.port.id,
@@ -133,3 +135,5 @@ def ddns_runner():
                     )
                 else:
                     rule_runner(rule_id=rule.id)
+
+    return {"status": "checked", "checked": len(rules), "queued": queued}

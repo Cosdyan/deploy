@@ -110,3 +110,13 @@ with db_session() as db:
 print("PASS: expiry without historical traffic, actual ingress/egress policy application and removal, exact quota threshold and independent no-action deadline")
 '''
 subprocess.run(["docker","compose","-f","docker-compose.yml","-f","ci-compose.yml","exec","-T","worker","python","-c",policy_code],check=True)
+
+ddns_code = """
+from tasks import ddns_runner
+from tasks.config import huey
+assert any(task.name == "ddns_runner" for task in huey._registry.periodic_tasks)
+result=ddns_runner(force=True).get(blocking=True,timeout=60)
+assert result["status"]=="checked" and result["checked"]>=0 and result["queued"]>=0,result
+print("PASS: registered DDNS scheduler and queued execution against actual database")
+"""
+subprocess.run(["docker","compose","-f","docker-compose.yml","-f","ci-compose.yml","exec","-T","worker","python","-c",ddns_code],check=True)
