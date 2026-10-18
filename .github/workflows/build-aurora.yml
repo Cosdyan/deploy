@@ -125,6 +125,8 @@ jobs:
             -e ASYNC_DATABASE_URL=postgresql+asyncpg://aurora:isolated_test_password@127.0.0.1:5432/aurora \
             -e REDIS_HOST=127.0.0.1 -e PYTHONPATH=/app -e ENABLE_SENTRY=no \
             aurora-backend-ci:local python -c "import app.main; from tasks import app_runner, rule_runner, tc_runner, clean_port_no_update_runner; import tasks.iptables; print('Backend and restored task imports passed')"
+      - name: Verify Gost IPv6 forwarding address parsing
+        run: docker run --rm --network host -v "$PWD/tests/gost.py:/tmp/aurora-gost-test.py:ro" -e DATABASE_URL=postgresql://aurora:isolated_test_password@127.0.0.1:5432/aurora -e REDIS_HOST=127.0.0.1 -e PYTHONPATH=/app aurora-backend-ci:local python /tmp/aurora-gost-test.py
       - name: Verify DDNS task selection and resolution failure handling
         run: docker run --rm --network host -v "$PWD/tests/ddns.py:/tmp/aurora-ddns-test.py:ro" -e DATABASE_URL=postgresql://aurora:isolated_test_password@127.0.0.1:5432/aurora -e REDIS_HOST=127.0.0.1 -e PYTHONPATH=/app aurora-backend-ci:local python /tmp/aurora-ddns-test.py
       - name: Verify DNS resolution against disposable local UDP server
