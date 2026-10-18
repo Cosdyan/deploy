@@ -131,6 +131,8 @@ jobs:
         run: docker run --rm -v "$PWD/tests/dns.py:/tmp/aurora-dns-test.py:ro" -e PYTHONPATH=/app aurora-backend-ci:local python /tmp/aurora-dns-test.py
       - name: Verify forwarding input validation and firewall preservation
         run: bash tests/iptables-validation.sh
+      - name: Verify actual NAT forwarding in isolated network namespaces
+        run: sudo python3 tests/nat.py
       - name: Verify real traffic control on disposable dummy interface
         run: bash tests/traffic-control.sh
       - name: Verify isolated Redis connectivity
