@@ -116,6 +116,7 @@ const ServerInfoModal = ({ modalProps = {}, close, resolve }: ServerInfoModalPro
   const handleSubmit = async () => {
     setValidation("");
     if (!name.trim() || !address.trim()) { setValidation(t("Complete server name and address")); return; }
+    // Input values are strings; accept decimal digits before converting the port to a number.
     if (port && (!/^\d+$/.test(String(port)) || Number(port) < 1 || Number(port) > 65535)) { setValidation(t("SSH port must be between 1 and 65535")); return; }
     try {
     let actualKeyFileId = keyFileId;
