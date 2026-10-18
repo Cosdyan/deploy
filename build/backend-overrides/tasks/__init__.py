@@ -27,4 +27,4 @@ from tasks.limits import port_limits_runner
 
 from tasks.meter import collect_port_traffic, collect_all_port_traffic
 
-from tasks.iptables import ddns_runner, iptables_runner, iptables_reset_runner
+from tasks.iptables import ddns_runner, ddns_scan_runner, iptables_runner, iptables_reset_runner

@@ -112,10 +112,10 @@ print("PASS: expiry without historical traffic, actual ingress/egress policy app
 subprocess.run(["docker","compose","-f","docker-compose.yml","-f","ci-compose.yml","exec","-T","worker","python","-c",policy_code],check=True)
 
 ddns_code = """
-from tasks import ddns_runner
+from tasks import ddns_runner, ddns_scan_runner
 from tasks.config import huey
 assert any(task.name == "ddns_runner" for task in huey._registry.periodic_tasks)
-result=ddns_runner(force=True).get(blocking=True,timeout=60)
+result=ddns_scan_runner(force=True).get(blocking=True,timeout=60)
 assert result["status"]=="checked" and result["checked"]>=0 and result["queued"]>=0,result
 print("PASS: registered DDNS scheduler and queued execution against actual database")
 """

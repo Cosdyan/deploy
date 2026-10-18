@@ -3,7 +3,7 @@ from contextlib import nullcontext
 from types import SimpleNamespace
 from unittest.mock import patch,Mock
 from app.db.models import MethodEnum
-from tasks.iptables import ddns_runner
+from tasks.iptables import ddns_scan_runner as ddns_runner
 port=SimpleNamespace(id=21,num=18090,server=SimpleNamespace(id=9))
 rule=SimpleNamespace(id=15,method=MethodEnum.IPTABLES,port=port,config={"remote_address":"aurora.test","remote_ip":"192.0.2.1","remote_port":80,"type":"ALL"})
 with patch("time.time",return_value=0), patch("tasks.iptables.db_session",side_effect=lambda:nullcontext(None)), patch("tasks.iptables.get_all_ddns_rules",return_value=[rule]), patch("tasks.iptables.dns_query",return_value="192.0.2.2") as dns, patch("tasks.iptables.iptables_runner") as queued:

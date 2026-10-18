@@ -101,8 +101,8 @@ def iptables_reset_runner(
     )
 
 
-@huey.periodic_task(crontab(minute="*"))
-def ddns_runner(force: bool = False):
+@huey.task(priority=4)
+def ddns_scan_runner(force: bool = False):
     from time import time
     interval = max(1, int(DDNS_INTERVAL_SECONDS) // 60)
     if not force and (int(time()) // 60) % interval:
@@ -137,3 +137,8 @@ def ddns_runner(force: bool = False):
                     rule_runner(rule_id=rule.id)
 
     return {"status": "checked", "checked": len(rules), "queued": queued}
+
+
+@huey.periodic_task(crontab(minute="*"))
+def ddns_runner():
+    ddns_scan_runner()
