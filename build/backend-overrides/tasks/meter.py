@@ -27,7 +27,14 @@ def meter_commands(ports):
 
 def parse_counters(text):
     totals={}
+    family="iptables"
     for line in text.splitlines():
+        if line == "__AURORA_IPV4__":
+            family="iptables"
+            continue
+        if line == "__AURORA_IPV6__":
+            family="ip6tables"
+            continue
         counter=re.match(r"^\[(\d+):(\d+)\] ",line)
         if not counter:
             continue
@@ -37,6 +44,13 @@ def parse_counters(text):
         label=fields[fields.index("--comment")+1]
         match=re.fullmatch(r"AURORA_(INPUT|OUTPUT)_(\d+)_(iptables|ip6tables)_(tcp|udp)",label)
         if not match:
+            legacy=re.fullmatch(r"(UPLOAD|DOWNLOAD)(-UDP)? (\d+)->.+",label)
+            if legacy and len(fields)>1 and fields[0]=="-A" and fields[1]=="FORWARD":
+                direction="upload" if legacy[1]=="UPLOAD" else "download"
+                protocol="udp" if legacy[2] else "tcp"
+                key=f"{direction}:forward:{family}:{protocol}"
+                values=totals.setdefault(int(legacy[3]),{})
+                values[key]=values.get(key,0)+int(counter[2])
             continue
         port=int(match[2])
         direction="download" if match[1]=="INPUT" else "upload"
@@ -55,7 +69,7 @@ def collect_port_traffic(server_id):
             return {"status":"empty","server_id":server_id,"ports":0}
         with connect(server_id) as conn:
             conn.sudo("sh -c " + shlex.quote(meter_commands(numbers)),hide=True)
-            result=conn.sudo("sh -c " + shlex.quote("set -e; iptables-save -c; ip6tables-save -c"),hide=True)
+            result=conn.sudo("sh -c " + shlex.quote("set -e; echo __AURORA_IPV4__; iptables-save -c; echo __AURORA_IPV6__; ip6tables-save -c"),hide=True)
         totals=parse_counters(result.stdout)
         with db_session() as db:
             ports=db.query(Port).filter(Port.server_id==server_id,Port.is_active==True).all()

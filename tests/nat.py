@@ -31,6 +31,7 @@ with tempfile.TemporaryDirectory() as directory:
   else: raise AssertionError(result.stderr)
   rules=ns(names[1],"iptables","-t","nat","-S").stdout
   assert "FORWARD 18091->10.250.2.2:18092" in rules,rules
+  pathlib.Path("nat-counter-fixture.txt").write_text("__AURORA_IPV4__\n"+ns(names[1],"iptables-save","-c").stdout)
   script("delete")
   rules=ns(names[1],"iptables","-t","nat","-S").stdout
   assert "18091->" not in rules,rules

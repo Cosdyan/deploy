@@ -132,7 +132,9 @@ jobs:
       - name: Verify forwarding input validation and firewall preservation
         run: bash tests/iptables-validation.sh
       - name: Verify actual NAT forwarding in isolated network namespaces
-        run: sudo python3 tests/nat.py
+        run: |
+          sudo python3 tests/nat.py
+          docker run --rm --network host -v "$PWD/tests/meter-forwarding.py:/tmp/meter-forwarding.py:ro" -v "$PWD/nat-counter-fixture.txt:/tmp/nat-counter-fixture.txt:ro" -e DATABASE_URL=postgresql://aurora:isolated_test_password@127.0.0.1:5432/aurora -e REDIS_HOST=127.0.0.1 -e PYTHONPATH=/app aurora-backend-ci:local python /tmp/meter-forwarding.py
       - name: Verify real traffic control on disposable dummy interface
         run: bash tests/traffic-control.sh
       - name: Verify isolated Redis connectivity
